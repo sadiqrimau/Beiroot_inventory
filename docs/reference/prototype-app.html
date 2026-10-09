@@ -1,0 +1,911 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stock ledger — central kitchen and branches</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F6F7F4;--surface:#FFFFFF;--ink:#17201B;--muted:#5E6B63;--line:#D5DBD5;--green:#1E5C46;--green-soft:#E3EEE8;--red:#A8321F;--red-soft:#F6E3DF;--amber:#8F5600;--amber-soft:#F5EAD6;
+ --f:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111714;--surface:#19211D;--ink:#E4EBE6;--muted:#97A59C;--line:#2B3731;--green:#62B892;--green-soft:#1D3229;--red:#E07A65;--red-soft:#3A211C;--amber:#D9A04A;--amber-soft:#33281A}}
+:root[data-theme="dark"]{--bg:#111714;--surface:#19211D;--ink:#E4EBE6;--muted:#97A59C;--line:#2B3731;--green:#62B892;--green-soft:#1D3229;--red:#E07A65;--red-soft:#3A211C;--amber:#D9A04A;--amber-soft:#33281A}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:var(--f);font-size:16px;line-height:1.45;font-variant-numeric:tabular-nums}
+#app{max-width:760px;margin:0 auto;padding:0 16px 96px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 0 12px;border-bottom:2px solid var(--ink)}
+.brand{font-weight:800;font-stretch:75%;font-size:1.5rem;letter-spacing:-.01em}
+.me{background:none;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font:inherit;font-size:.85rem;color:var(--ink);cursor:pointer}
+h1{font-stretch:75%;font-weight:800;font-size:2.4rem;line-height:1.05;margin:32px 0 8px}
+h2{font-stretch:87%;font-weight:700;font-size:1.15rem;margin:28px 0 10px}
+h3{font-size:1rem;margin:0 0 8px;font-weight:700}
+h3 small,small{color:var(--muted);font-weight:400;font-size:.82rem}
+.lede{color:var(--muted);margin:0 0 12px;max-width:62ch}
+.headline{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:2px;margin:20px 0 4px;background:var(--line);border:1px solid var(--line)}
+.headline>div{background:var(--surface);padding:14px 14px 12px;display:flex;flex-direction:column}
+.big{font-weight:800;font-stretch:62%;font-size:2.6rem;line-height:1;letter-spacing:-.01em}
+.headline span:not(.big){color:var(--muted);font-size:.85rem;margin-top:4px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;margin:12px 0}
+.card.open{border-left:4px solid var(--green)}
+details.card>summary{cursor:pointer;font-weight:700}
+details.card[open]>summary{margin-bottom:12px}
+label{display:block;font-size:.85rem;color:var(--muted);margin:10px 0}
+label>input,label>select{display:block;width:100%;margin-top:4px}
+input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:9px 10px;min-height:44px}
+input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid var(--green);outline-offset:2px}
+.check{display:flex;gap:8px;align-items:center;color:var(--ink)}.check input{min-height:auto;width:auto;margin:0}
+.lines{display:flex;flex-direction:column;gap:6px;margin:6px 0}
+.line{display:grid;grid-template-columns:1fr 96px 44px 32px;gap:6px;align-items:center}
+.line .fixed{padding:9px 0}.line .unit{color:var(--muted);font-size:.85rem}
+.lines .line:has(.fixed){grid-template-columns:1fr 96px 44px}
+button{font:inherit;cursor:pointer;border-radius:4px;min-height:44px;padding:8px 16px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+button.primary{background:var(--green);border-color:var(--green);color:var(--bg);font-weight:700;margin-top:10px}
+button.danger{background:var(--red);border-color:var(--red);color:var(--bg);font-weight:700;margin-top:10px}
+button.ghost{border:none;background:none;color:var(--green);padding:4px 0;min-height:32px;font-weight:600}
+button.x{border:none;background:none;color:var(--muted);font-size:1.3rem;padding:0;min-height:32px}
+button:disabled{opacity:.5;cursor:wait}
+.alerts{list-style:none;padding:0;margin:0;border-top:1px solid var(--line)}
+.alerts li{display:grid;grid-template-columns:14px 1fr auto;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);align-items:start}
+.alerts li div{display:flex;flex-direction:column;gap:2px;min-width:0}.alerts li span{overflow-wrap:anywhere}
+.alerts em{font-style:normal;font-weight:700;color:var(--red);white-space:nowrap}
+.sev{width:10px;height:10px;border-radius:50%;margin-top:6px}.sev-high{background:var(--red)}.sev-med{background:var(--amber)}.sev-low{background:var(--line)}
+.empty{color:var(--muted)}
+.note{background:var(--amber-soft);color:var(--ink);padding:10px 12px;border-radius:4px}
+.banner{background:var(--green-soft);color:var(--ink);padding:8px 12px;margin:10px 0 0;font-size:.88rem;border-radius:4px}.banner.warn{background:var(--amber-soft)}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:4px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.9rem}th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-weight:700;font-size:.8rem;color:var(--muted)}td.n,th.n{text-align:right;white-space:nowrap}td.neg{color:var(--red);font-weight:700}
+.plain{list-style:none;padding:0;margin:0}.plain li{padding:10px 0;border-bottom:1px solid var(--line)}
+.log{list-style:none;padding:0;margin:0}.log li{display:grid;grid-template-columns:110px 1fr;column-gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
+.log time{color:var(--muted);font-size:.82rem;grid-row:span 3}.log span{overflow-wrap:anywhere;font-size:.9rem}
+.tag{display:inline-block;font-size:.78rem;padding:2px 8px;border-radius:999px;background:var(--line);white-space:nowrap}.tag.ok{background:var(--green-soft);color:var(--green)}.tag.bad{background:var(--red-soft);color:var(--red)}.tag.warn{background:var(--amber-soft);color:var(--amber)}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;gap:2px;background:var(--surface);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}
+nav button{flex:1;max-width:150px;border:none;background:none;font-size:.82rem;color:var(--muted);padding:8px 4px}
+nav button.on{color:var(--ink);font-weight:700;box-shadow:inset 0 3px 0 var(--green)}
+.badge{background:var(--red);color:var(--bg);border-radius:999px;padding:0 6px;font-size:.72rem;font-weight:700}
+.setup .roles{border:none;padding:0;margin:14px 0;display:flex;flex-wrap:wrap;gap:8px}.setup legend{font-size:.85rem;color:var(--muted);margin-bottom:6px}
+.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:6px 14px;margin:0;color:var(--ink);cursor:pointer;background:var(--surface)}
+.pill input{min-height:auto;width:auto;margin:0}.pill:has(input:checked){border-color:var(--green);background:var(--green-soft)}
+.hide{display:none}
+.rep-h{margin:18px 0 6px;display:flex;justify-content:space-between}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+tbody th{width:42%;color:var(--muted);font-weight:600}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:6px;max-width:90vw;font-size:.9rem}.toast.bad{background:var(--red)}
+@media (max-width:480px){.log li{grid-template-columns:1fr}.log time{grid-row:auto}.line{grid-template-columns:1fr 80px 36px 28px}.lines .line:has(.fixed){grid-template-columns:1fr 80px 36px}}
+</style>
+</head>
+<body><div id="app"></div>
+<script>
+/* Stock ledger engine — append-only events in, stock positions + alerts out.
+   Shared by the app (browser) and the simulation (node). */
+(function (root) {
+  const H = 3600e3, DAY = 24 * H;
+
+  const ITEMS = {
+    CHK:   { name: 'Whole chicken',        unit: 'kg',    kind: 'raw',  price: 4500 },
+    BEEF:  { name: 'Minced beef',          unit: 'kg',    kind: 'raw',  price: 6000 },
+    RICE:  { name: 'Rice',                 unit: 'kg',    kind: 'raw',  price: 1600 },
+    TOM:   { name: 'Tomatoes',             unit: 'kg',    kind: 'raw',  price: 1500 },
+    PEP:   { name: 'Pepper',               unit: 'kg',    kind: 'raw',  price: 2000 },
+    ONI:   { name: 'Onions',               unit: 'kg',    kind: 'raw',  price: 1200 },
+    OIL:   { name: 'Vegetable oil',        unit: 'L',     kind: 'raw',  price: 2800 },
+    SPICE: { name: 'Spice mix',            unit: 'pack',  kind: 'raw',  price: 500  },
+    PLANT: { name: 'Plantain',             unit: 'kg',    kind: 'raw',  price: 1000 },
+    BUN:   { name: 'Burger buns (6)',      unit: 'pack',  kind: 'raw',  price: 1500 },
+    PACK:  { name: 'Takeaway packs (50)',  unit: 'pack',  kind: 'raw',  price: 6000 },
+    MCHK:  { name: 'Marinated chicken (20 pcs)', unit: 'tray', kind: 'semi', price: 26000 },
+    JOL:   { name: 'Jollof base',          unit: 'kg',    kind: 'semi', price: 1400 },
+    PATTY: { name: 'Burger patties (12)',  unit: 'tray',  kind: 'semi', price: 10000 },
+    STEW:  { name: 'Stew base',            unit: 'L',     kind: 'semi', price: 2600 },
+  };
+
+  const LOCS = { store: 'Central store', kitchen: 'Central kitchen', branchA: 'Branch A', branchB: 'Branch B' };
+  const BRANCHES = ['branchA', 'branchB'];
+
+  // Defaults. yieldStandards stays empty until real yields are agreed (deliberately deferred).
+  const DEFAULT_RULES = {
+    countTolerancePct: 2,      // variance under this % of book (or under minAbs) is ignored
+    countToleranceAbs: 0.5,
+    transitHours: 6,           // dispatched but not received within this → open transit alert
+    yieldDueHours: 24,         // kitchen issue with no yield report → alert
+    purchaseGrnHours: 24,
+    wasteWatchPct: 3,          // waste above this share of location throughput → watch
+    yieldTolerancePct: 8,
+    yieldStandards: {},
+    countAlertValue: 5000,     // ₦ lost in one count before a gap is high priority
+    writeOffWitnessValue: 5000,// ₦ write-off that needs a second person        // e.g. { MCHK: { CHK: 5, SPICE: 1 } } = inputs per 1 unit of output
+  };
+
+  const r2 = x => Math.round(x * 100) / 100;
+  const add = (m, loc, code, q) => { (m[loc] = m[loc] || {}); m[loc][code] = r2((m[loc][code] || 0) + q); };
+  const lineMap = lines => { const m = {}; (lines || []).forEach(l => m[l.code] = r2((m[l.code] || 0) + Number(l.qty || 0))); return m; };
+  const value = lines => (lines || []).reduce((s, l) => s + Math.abs(l.qty) * ((ITEMS[l.code] || {}).price || 0), 0);
+  const same = (a, b) => a && b && a.trim().toLowerCase() === b.trim().toLowerCase();
+
+  function apply(events, rulesIn, now) {
+    const R = Object.assign({}, DEFAULT_RULES, rulesIn || {});
+    const ev = events.slice().sort((a, b) => a.ts - b.ts || (a.id < b.id ? -1 : 1));
+    now = now || (ev.length ? ev[ev.length - 1].ts : Date.now());
+
+    const book = {};                 // loc -> code -> qty
+    const transit = {};              // movId -> {release, lines}
+    const purchases = {}, grns = {}, requests = {}, releases = {}, receipts = {};
+    const sessions = {};             // sessionId -> {open, close, events:[]}
+    const kitchenIssues = {};        // movId -> release (dest kitchen)
+    const yields = [];
+    const counts = [];               // {event, loc, variances:[{code,book,counted,diff}]}
+    const throughput = {}, waste = {};
+    const corrections = {};
+    const alerts = [];
+    const alert = (code, sev, title, detail, ev, who, refs, val) =>
+      alerts.push({ code, sev, title, detail, ts: ev ? ev.ts : now, eventId: ev && ev.id, accountable: who || null, refs: refs || {}, value: Math.round(val || 0) });
+
+    let openSession = null;
+
+    for (const e of ev) {
+      const by = e.by || {};
+      switch (e.type) {
+        case 'STORE_OPEN':
+          sessions[e.sessionId] = { open: e, close: null, moves: 0 };
+          openSession = e.sessionId; break;
+        case 'STORE_CLOSE':
+          if (sessions[e.sessionId]) sessions[e.sessionId].close = e;
+          if (openSession === e.sessionId) openSession = null; break;
+
+        case 'PURCHASE': purchases[e.poId] = e; break;
+
+        case 'GRN': {
+          grns[e.poId] = e;
+          if (!openSession) alert('STORE_NOT_OPEN', 'high', 'Goods received with store not logged open', `PO ${e.poId}`, e, by.name);
+          else sessions[openSession].moves++;
+          e.lines.forEach(l => { add(book, 'store', l.code, l.qty); throughput.store = (throughput.store || 0) + l.qty; });
+          const po = purchases[e.poId];
+          if (!po) { alert('GRN_NO_PO', 'med', 'Goods received without a purchase record', `PO ${e.poId}`, e, by.name, { poId: e.poId }); break; }
+          const bought = lineMap(po.lines), got = lineMap(e.lines);
+          const short = [];
+          Object.keys(bought).forEach(c => { const d = r2(bought[c] - (got[c] || 0)); if (Math.abs(d) > 0.001) short.push({ code: c, qty: d }); });
+          if (short.length) alert('GRN_MISMATCH', 'high', 'Purchase and goods received differ',
+            short.map(s => `${s.code} ${s.qty > 0 ? 'short' : 'over'} ${Math.abs(s.qty)}`).join(', '),
+            e, po.by.name + ' / ' + by.name, { poId: e.poId }, value(short.filter(s => s.qty > 0)));
+          if (same(po.by.name, by.name)) alert('SELF_RECEIVED', 'high', 'Buyer confirmed his own delivery', `PO ${e.poId}`, e, by.name, { poId: e.poId });
+          break;
+        }
+
+        case 'REQUEST': requests[e.reqId] = e; break;
+
+        case 'RELEASE': {
+          releases[e.movId] = e;
+          if (!openSession) alert('STORE_NOT_OPEN', 'high', 'Stock released with store not logged open', `Movement ${e.movId}`, e, by.name, { movId: e.movId });
+          else sessions[openSession].moves++;
+          e.lines.forEach(l => { add(book, 'store', l.code, -l.qty); throughput.store = (throughput.store || 0) + l.qty; });
+          if (e.dest === 'kitchen') {
+            e.lines.forEach(l => add(book, 'kitchen', l.code, l.qty));
+            kitchenIssues[e.movId] = e;
+          } else {
+            transit[e.movId] = { release: e, lines: e.lines };
+          }
+          const req = e.reqId && requests[e.reqId];
+          if (!req) {
+            alert('EMERGENCY_RELEASE', 'med', 'Released without a request', `${e.movId} to ${LOCS[e.dest] || e.dest}${e.reason ? ' — ' + e.reason : ''}`, e, by.name, { movId: e.movId }, value(e.lines));
+          } else {
+            const asked = lineMap(req.lines), sent = lineMap(e.lines), over = [];
+            Object.keys(sent).forEach(c => { const d = r2(sent[c] - (asked[c] || 0)); if (d > 0.001) over.push({ code: c, qty: d }); });
+            if (over.length) alert('OVER_RELEASE', 'high', 'Released more than was requested', over.map(o => `${o.code} +${o.qty}`).join(', '), e, by.name, { movId: e.movId, reqId: e.reqId }, value(over));
+            if (same(req.by.name, e.carrier)) alert('CARRIER_REQUESTED', 'high', 'Driver raised the request he is carrying', `${e.reqId} raised by ${req.by.name}`, e, e.carrier, { movId: e.movId, reqId: e.reqId });
+          }
+          break;
+        }
+
+        case 'RECEIPT': {
+          receipts[e.movId] = e;
+          const t = transit[e.movId], rel = releases[e.movId];
+          if (!rel) { alert('RECEIPT_NO_RELEASE', 'med', 'Receipt for an unknown movement', e.movId, e, by.name); break; }
+          delete transit[e.movId];
+          e.lines.forEach(l => add(book, rel.dest, l.code, l.qty));
+          const sent = lineMap(rel.lines), got = lineMap(e.lines), short = [];
+          Object.keys(sent).forEach(c => { const d = r2(sent[c] - (got[c] || 0)); if (Math.abs(d) > 0.001) short.push({ code: c, qty: d }); });
+          if (short.length) alert('TRANSIT_SHORT', 'high', 'Branch received less than was released',
+            short.map(s => `${s.code} ${s.qty > 0 ? 'short' : 'over'} ${Math.abs(s.qty)}`).join(', '), e, rel.carrier, { movId: e.movId }, value(short.filter(s => s.qty > 0)));
+          if (same(rel.carrier, by.name)) alert('CARRIER_RECEIVED', 'high', 'Driver confirmed his own delivery', e.movId, e, by.name, { movId: e.movId });
+          if (!e.photo) alert('NO_PHOTO', 'low', 'Handover recorded without a photo', e.movId, e, rel.carrier, { movId: e.movId });
+          break;
+        }
+
+        case 'YIELD': {
+          yields.push(e);
+          (e.inputs || []).forEach(l => add(book, 'kitchen', l.code, -l.qty));
+          (e.outputs || []).forEach(l => add(book, 'store', l.code, l.qty));
+          (e.issueIds || []).forEach(id => { if (kitchenIssues[id]) kitchenIssues[id].yielded = true; });
+          const std = R.yieldStandards, used = lineMap(e.inputs), expect = {}, outVal = {};
+          (e.outputs || []).forEach(o => { const s = std[o.code]; if (!s) return;
+            Object.keys(s).forEach(c => { expect[c] = (expect[c] || 0) + s[c] * o.qty; outVal[c] = (outVal[c] || 0) + o.qty * ITEMS[o.code].price; }); });
+          const low = Object.keys(expect).filter(c => expect[c] > 0 && (used[c] || 0) > expect[c] * (1 + R.yieldTolerancePct / 100));
+          if (low.length) alert('LOW_YIELD', 'high', 'Yield below standard',
+            low.map(c => `${used[c]} ${c} used, standard ${r2(expect[c])}`).join('; '), e, by.name, { batchId: e.batchId },
+            Math.max(...low.map(c => (used[c] - expect[c]) * ITEMS[c].price)));
+          break;
+        }
+
+        case 'USE': case 'WASTE': {
+          e.lines.forEach(l => add(book, e.loc, l.code, -l.qty));
+          if (e.type === 'WASTE') {
+            waste[e.loc] = (waste[e.loc] || 0) + value(e.lines);
+            if (value(e.lines) >= R.writeOffWitnessValue && (!e.witness || same(e.witness, by.name)))
+              alert('WRITE_OFF_UNWITNESSED', 'high', 'Large write-off with no witness', `${LOCS[e.loc]}: ${e.lines.map(l => l.qty + ' ' + l.code).join(', ')} — ${e.reason || 'no reason'}`, e, by.name, { loc: e.loc }, value(e.lines));
+          }
+          else throughput[e.loc + ':v'] = (throughput[e.loc + ':v'] || 0) + value(e.lines);
+          break;
+        }
+
+        case 'COUNT': {
+          const b = book[e.loc] || {}, cnt = lineMap(e.lines), vs = [];
+          const selfCount = e.custodian && same(e.custodian, by.name);
+          const codes = new Set([...Object.keys(cnt), ...Object.keys(b).filter(c => Math.abs(b[c]) > 0.001)]);
+          codes.forEach(c => {
+            if (!(c in cnt) && e.partial) return;
+            const bk = b[c] || 0, ct = cnt[c] || 0, d = r2(ct - bk);
+            const tol = Math.max(R.countToleranceAbs, Math.abs(bk) * R.countTolerancePct / 100);
+            if (Math.abs(d) > tol) vs.push({ code: c, book: bk, counted: ct, diff: d });
+            if (!selfCount) add(book, e.loc, c, d);   // book follows an independent count only
+          });
+          counts.push({ event: e, loc: e.loc, variances: vs, held: selfCount });
+          if (selfCount) {
+            alert('SELF_COUNT', 'high', 'Custodian counted his own stock — count held', `${LOCS[e.loc]} counted by ${by.name}; book unchanged until an independent recount`, e, by.name, { loc: e.loc });
+            break;
+          }
+          const lost = vs.filter(v => v.diff < 0), lostVal = value(lost.map(v => ({ code: v.code, qty: v.diff })));
+          if (vs.length) alert('COUNT_VARIANCE', lostVal >= R.countAlertValue ? 'high' : 'low', `Count gap at ${LOCS[e.loc]}`,
+            vs.map(v => `${v.code} ${v.diff > 0 ? '+' : ''}${v.diff}`).join(', '), e, null, { loc: e.loc }, lostVal);
+          break;
+        }
+
+        case 'CORRECTION': {
+          (e.lines || []).forEach(l => add(book, e.loc, l.code, l.qty));
+          corrections[by.name] = (corrections[by.name] || 0) + 1;
+          if (!e.refId || !e.reason) alert('BAD_CORRECTION', 'med', 'Correction without reference or reason', '', e, by.name);
+          break;
+        }
+      }
+    }
+
+    // Time-based checks at "now"
+    Object.values(transit).forEach(t => {
+      if (now - t.release.ts > R.transitHours * H)
+        alert('TRANSIT_OPEN', 'high', 'Dispatched but never received', `${t.release.movId} to ${LOCS[t.release.dest]}, carried by ${t.release.carrier}`, t.release, t.release.carrier, { movId: t.release.movId }, value(t.lines));
+    });
+    Object.values(kitchenIssues).forEach(k => {
+      if (!k.yielded && now - k.ts > R.yieldDueHours * H)
+        alert('NO_YIELD', 'med', 'Kitchen took stock but reported no yield', k.movId, k, k.receivedBy || 'Cooking staff', { movId: k.movId }, value(k.lines));
+    });
+    Object.values(purchases).forEach(p => {
+      if (!grns[p.poId] && now - p.ts > R.purchaseGrnHours * H)
+        alert('PURCHASE_NOT_RECEIVED', 'med', 'Purchase logged but never received', p.poId, p, p.by.name, { poId: p.poId }, value(p.lines));
+    });
+    Object.entries(sessions).forEach(([id, s]) => {
+      if (s.moves === 0 && s.close)
+        alert('IDLE_OPENING', 'med', 'Store opened with nothing recorded', `${s.open.reason || 'no reason'} — present: ${(s.open.present || []).join(', ')}`, s.open, s.open.by.name, { sessionId: id });
+      if (!s.close && now - s.open.ts > 12 * H)
+        alert('STORE_LEFT_OPEN', 'med', 'Store session never closed', id, s.open, s.open.by.name, { sessionId: id });
+    });
+    Object.keys(waste).forEach(loc => {
+      const tv = (throughput[loc + ':v'] || 0) + waste[loc];
+      if (tv > 0 && waste[loc] / tv * 100 > R.wasteWatchPct)
+        if (throughput[loc + ':v']) alert('HIGH_WASTE', 'med', `Waste is high at ${LOCS[loc]}`, `${Math.round(waste[loc] / tv * 100)}% of stock value moved`, null, null, { loc }, waste[loc]);
+    });
+
+    alerts.sort((a, b) => b.ts - a.ts);
+    return { book, transit, releases, receipts, requests, purchases, grns, sessions, yields, counts, alerts, corrections, rules: R };
+  }
+
+  const api = { ITEMS, LOCS, BRANCHES, DEFAULT_RULES, apply, value, H, DAY };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.StockEngine = api;
+})(this);
+
+function makeSim(E) {
+const { ITEMS, H, DAY } = E;
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+const RECIPE = { MCHK:{CHK:5,SPICE:1}, JOL:{RICE:0.45,TOM:0.13,OIL:0.05}, PATTY:{BEEF:1.5,ONI:0.2}, STEW:{TOM:0.67,PEP:0.2,ONI:0.2,OIL:0.17} };
+const BASE = { MCHK:2, JOL:15, PATTY:3, STEW:6, PLANT:8, BUN:6, PACK:2, OIL:3 };   // per branch per day
+const P = { turnkey:'Ibrahim', store:'Musa', buyer:'Tunde', cook:'Aisha', driver:'Yusuf', A:'Bola', A2:'Ngozi', B:'Femi', B2:'Sola', counter2:'Kemi' };
+const by = (name, role) => ({ name, role });
+const r2 = x => Math.round(x*100)/100;
+
+function run(seed, incidentsOn) {
+  const rnd = mulberry32(seed);
+  const U = (a,b) => a + (b-a)*rnd();
+  const phys = { store:{}, kitchen:{}, branchA:{}, branchB:{}, driver:{}, outside:{} };
+  const get = (l,c) => phys[l][c] || 0;
+  const mv = (f,t,c,q) => { if (f) phys[f][c] = r2(get(f,c)-q); if (t) phys[t][c] = r2(get(t,c)+q); };
+  const events = []; let n = 0;
+  const emit = (type, ts, who, p) => { const e = Object.assign({ id: 'e'+(++n), ts, type, by: who }, p); events.push(e); return e; };
+  let sess = 0, mov = 0, req = 0, po = 0, batch = 0;
+  const open = (ts, reason, present) => { const id = 'S'+(++sess); emit('STORE_OPEN', ts, by(P.store,'storekeeper'), { sessionId:id, reason, present }); return id; };
+  const close = (ts, id) => emit('STORE_CLOSE', ts, by(P.store,'storekeeper'), { sessionId:id });
+  const incidents = [];
+  const inc = (id, day, title, loss, match) => incidents.push({ id, day, title, loss, match });
+  const on = id => incidentsOn && incidentsOn.has(id);
+  const val = (c,q) => q * ITEMS[c].price;
+
+  // Opening stock
+  const t0 = 6*H;
+  let s = open(t0, 'Opening stock', [P.store, P.turnkey]);
+  const openLines = { CHK:50, SPICE:10, RICE:40, TOM:30, PEP:6, ONI:10, OIL:30, BEEF:22, PLANT:40, BUN:30, PACK:10, MCHK:4, JOL:30, PATTY:6, STEW:12 };
+  const pid = 'PO'+(++po);
+  emit('PURCHASE', t0, by(P.buyer,'buyer'), { poId:pid, lines:Object.entries(openLines).map(([code,qty])=>({code,qty})) });
+  Object.entries(openLines).forEach(([c,q]) => mv(null,'store',c,q));
+  emit('GRN', t0+60e3, by(P.store,'storekeeper'), { poId:pid, lines:Object.entries(openLines).map(([code,qty])=>({code,qty})) });
+  close(t0+600e3, s);
+  for (const b of ['branchA','branchB']) Object.entries(BASE).forEach(([c,q]) => { phys[b][c] = r2(q*0.6); });
+  // record branch opening via a count (book starts at count)
+  for (const b of ['branchA','branchB']) emit('COUNT', t0+700e3, by(b==='branchA'?P.A2:P.B2,'branch'), { loc:b, custodian: b==='branchA'?P.A:P.B, lines:Object.keys(BASE).map(c=>({code:c,qty:phys[b][c]})) });
+
+  const DAYS = 14;
+  for (let d = 1; d <= DAYS; d++) {
+    const T = h => d*DAY + h*H;
+    // ---------- 06:00 store session: purchases, kitchen issue, production, planned dispatch
+    s = open(T(6), 'Morning operations', [P.store, P.cook, P.driver]);
+
+    if (d % 2 === 1) {   // buy every other day
+      const need = {};
+      Object.entries(RECIPE).forEach(([out,ins]) => Object.entries(ins).forEach(([c,q]) => need[c] = (need[c]||0) + q*BASE[out]*2*2*1.15));
+      ['PLANT','BUN','PACK','OIL'].forEach(c => need[c] = (need[c]||0) + BASE[c]*2*2*1.15);
+      const lines = Object.entries(need).map(([c,q]) => ({ code:c, qty: Math.max(0, Math.ceil(q - get('store',c))) })).filter(l => l.qty>0);
+      const id = 'PO'+(++po);
+      let recorded = lines.map(l=>({...l})), delivered = lines.map(l=>({...l})), grn = lines.map(l=>({...l}));
+      if (d===5 && on('I5')) {   // supplier short-delivers, buyer logs full amount, storekeeper counts honestly
+        const L = delivered.find(l=>l.code==='CHK'); L.qty -= 3; grn.find(l=>l.code==='CHK').qty -= 3;
+        inc('I5', d, 'Buyer pays for 3 kg chicken that never arrived', val('CHK',3), a => a.some(x=>x.code==='GRN_MISMATCH' && x.refs.poId===id) ? 'named' : null);
+      }
+      if (d===7 && on('I6')) {   // buyer + storekeeper collude: GRN records full, 5 kg rice never arrived
+        delivered.find(l=>l.code==='RICE').qty -= 5;
+        inc('I6', d, 'Buyer and storekeeper collude: GRN signed for 5 kg rice not delivered', val('RICE',5), locMatch('store','RICE',5,d));
+      }
+      emit('PURCHASE', T(6.1), by(P.buyer,'buyer'), { poId:id, lines:recorded });
+      delivered.forEach(l => mv(null,'store',l.code,l.qty));
+      emit('GRN', T(6.3), by(P.store,'storekeeper'), { poId:id, lines:grn });
+    }
+
+    // kitchen production: plan = both branches' base
+    const plan = {}; Object.keys(RECIPE).forEach(o => plan[o] = BASE[o]*2);
+    const issue = {}; Object.entries(plan).forEach(([o,q]) => Object.entries(RECIPE[o]).forEach(([c,k]) => issue[c] = r2((issue[c]||0) + k*q)));
+    const kr = 'R'+(++req); emit('REQUEST', T(6.4), by(P.cook,'cook'), { reqId:kr, dest:'kitchen', kind:'production', lines:Object.entries(issue).map(([code,qty])=>({code,qty})) });
+    const km = 'M'+(++mov); const issued = Object.entries(issue).map(([code,qty])=>({code, qty: Math.min(qty, get('store',code))}));
+    issued.forEach(l => mv('store','kitchen',l.code,l.qty));
+    emit('RELEASE', T(6.5), by(P.store,'storekeeper'), { movId:km, reqId:kr, dest:'kitchen', receivedBy:P.cook, lines:issued });
+    let stolenChk = 0;
+    if (d===8 && on('I7')) { stolenChk = 4; mv('kitchen','outside','CHK',stolenChk);
+      const b = 'B'+(batch+1);
+      inc('I7', d, 'Cooks take 4 kg chicken home; yield reported lower', val('CHK',4), a => a.some(x=>x.code==='LOW_YIELD' && x.refs.batchId===b) ? 'named' : null); }
+    const outs = Object.keys(plan).map(o => {
+      const ins = RECIPE[o]; let k = Infinity;
+      Object.entries(ins).forEach(([c,q]) => { const have = issued.find(l=>l.code===c).qty - (c==='CHK'?stolenChk:0); k = Math.min(k, have/q); });
+      return { code:o, qty: r2(Math.min(plan[o], k) * U(0.97,1.02)) };
+    });
+    // inputs physically consumed = everything issued (minus stolen); recorded = everything issued
+    issued.forEach(l => { const q = get('kitchen',l.code); mv('kitchen',null,l.code,q); });
+    outs.forEach(o => mv(null,'store',o.code,o.qty));
+    emit('YIELD', T(8.5), by(P.cook,'cook'), { batchId:'B'+(++batch), issueIds:[km], inputs:issued, outputs:outs });
+
+    // planned dispatch to each branch
+    for (const b of ['branchA','branchB']) {
+      const recv = b==='branchA'?P.A:P.B;
+      const lines = Object.keys(BASE).map(c => ({ code:c, qty: Math.max(0, Math.round((BASE[c]*1.25 - get(b,c))*2)/2) })).filter(l=>l.qty>0);
+      const rq = 'R'+(++req); emit('REQUEST', T(8.6), by(recv,'branch'), { reqId:rq, branch:b, dest:b, kind:'planned', lines });
+      const m = 'M'+(++mov);
+      const rel = lines.map(l => ({ code:l.code, qty: Math.min(l.qty, Math.floor(get('store',l.code)*2)/2) })).filter(l=>l.qty>0);
+      rel.forEach(l => mv('store','driver',l.code,l.qty));
+      let extraOil = 0;
+      if (d===4 && b==='branchA' && on('I3')) { extraOil = 5; mv('store','driver','OIL',5);
+        inc('I3', d, 'Storekeeper loads 5 L extra oil off the record; driver keeps it', val('OIL',5), locMatch('store','OIL',5,d)); }
+      emit('RELEASE', T(9), by(P.store,'storekeeper'), { movId:m, reqId:rq, dest:b, carrier:P.driver, lines:rel });
+      if (extraOil) mv('driver','outside','OIL',extraOil);
+      // in transit
+      const got = rel.map(l=>({...l}));
+      let signed = got.map(l=>({...l}));
+      if (d===2 && b==='branchA' && on('I1')) { mv('driver','outside','MCHK',1); got.find(l=>l.code==='MCHK').qty -= 1; signed = got.map(l=>({...l}));
+        inc('I1', d, 'Driver skims 1 tray chicken; branch counts honestly', val('MCHK',1), a => a.some(x=>x.code==='TRANSIT_SHORT' && x.refs.movId===m) ? 'named' : null); }
+      if (d===3 && b==='branchB' && on('I2')) { mv('driver','outside','PATTY',1); got.find(l=>l.code==='PATTY').qty -= 1;  // receiver signs full
+        inc('I2', d, 'Driver skims 1 patty tray; receiver signs for full amount', val('PATTY',1), locMatch('branchB','PATTY',1,d)); }
+      if (d===10 && b==='branchB' && on('I2b')) { mv('driver','outside','MCHK',1); got.find(l=>l.code==='MCHK').qty -= 1;
+        inc('I2b', d, 'Driver + receiver collude, then cover it with extra recorded usage', val('MCHK',1), locMatch('branchB','MCHK',1,d)); phys._coverB = 1; }
+      got.forEach(l => mv('driver', b, l.code, l.qty));
+      // honest receipt-count slip 3%
+      signed = signed.map(l => (rnd()<0.03 ? {...l, qty: l.qty - 0.5} : l));
+      emit('RECEIPT', T(10), by(recv,'branch'), { movId:m, photo: rnd()>0.1, lines: signed.map(l=>({...l, status:'matched'})) });
+    }
+    close(T(10.5), s);
+
+    // I8: driver raises a fake top-up in branch A's name and keeps the goods
+    if (d===9 && on('I8')) {
+      const rq = 'R'+(++req); const lines = [{code:'MCHK',qty:1},{code:'OIL',qty:4}];
+      emit('REQUEST', T(12.9), by(P.driver,'driver'), { reqId:rq, branch:'branchA', dest:'branchA', kind:'topup', lines });
+      const s2 = open(T(13), 'Top-up branch A', [P.store, P.driver]); const m = 'M'+(++mov);
+      lines.forEach(l => { mv('store','driver',l.code,l.qty); mv('driver','outside',l.code,l.qty); });
+      emit('RELEASE', T(13.1), by(P.store,'storekeeper'), { movId:m, reqId:rq, dest:'branchA', carrier:P.driver, lines });
+      close(T(13.2), s2);
+      inc('I8', d, 'Driver raises a fake top-up and keeps the goods', val('MCHK',1)+val('OIL',4), a => a.some(x=>(x.code==='CARRIER_REQUESTED'||x.code==='TRANSIT_OPEN') && x.refs.movId===m) ? 'named' : null);
+    }
+    // I10: emergency release with no request, never arrives
+    if (d===11 && on('I10')) {
+      const s2 = open(T(15), 'Urgent: branch B out of patties', [P.store, P.driver]); const m = 'M'+(++mov);
+      const lines = [{code:'PATTY',qty:2}];
+      lines.forEach(l => { mv('store','driver',l.code,l.qty); mv('driver','outside',l.code,l.qty); });
+      emit('RELEASE', T(15.1), by(P.store,'storekeeper'), { movId:m, reqId:null, reason:'phone call from branch', dest:'branchB', carrier:P.driver, lines });
+      close(T(15.2), s2);
+      inc('I10', d, 'Emergency release by phone; goods never reach the branch', val('PATTY',2), a => a.some(x=>(x.code==='TRANSIT_OPEN') && x.refs.movId===m) ? 'named' : null);
+    }
+
+    // ---------- branch trading
+    for (const b of ['branchA','branchB']) {
+      const used = {};
+      const half = () => Object.keys(BASE).forEach(c => { const q = r2(Math.min(get(b,c), BASE[c]*U(0.4,0.6))); mv(b,null,c,q); used[c]=(used[c]||0)+q; });
+      half();
+      // top-up if low
+      const low = Object.keys(BASE).filter(c => get(b,c) < BASE[c]*0.35);
+      if (low.length) {
+        const recv = b==='branchA'?P.A:P.B;
+        const lines = low.map(c => ({ code:c, qty: Math.ceil(BASE[c]*0.5) }));
+        const rq = 'R'+(++req); emit('REQUEST', T(13.5), by(recv,'branch'), { reqId:rq, branch:b, dest:b, kind:'topup', lines });
+        const s2 = open(T(13.6), 'Top-up '+b, [P.store, P.driver]); const m = 'M'+(++mov);
+        const rel = lines.map(l => ({ code:l.code, qty: Math.min(l.qty, Math.floor(get('store',l.code))) })).filter(l=>l.qty>0);
+        rel.forEach(l => mv('store','driver',l.code,l.qty));
+        emit('RELEASE', T(13.7), by(P.store,'storekeeper'), { movId:m, reqId:rq, dest:b, carrier:P.driver, lines:rel });
+        close(T(13.8), s2);
+        let got = rel.map(l=>({...l})), signed = got.map(l=>({...l}));
+        if (d===13 && b==='branchA' && on('I12') && got.length) { const L = got[0]; mv('driver','outside',L.code,1); L.qty -= 1;
+          inc('I12', d, 'Driver skims a top-up run; receiver signs full', val(L.code,1), locMatch('branchA',L.code,1,d)); }
+        got.forEach(l => mv('driver',b,l.code,l.qty));
+        emit('RECEIPT', T(14.3), by(recv,'branch'), { movId:m, photo: rnd()>0.1, lines: signed.map(l=>({...l,status:'matched'})) });
+      }
+      half();
+      // record usage from POS (sum of real use) — I2b covers with inflated usage
+      const lines = Object.entries(used).map(([code,qty])=>({code,qty:r2(qty)}));
+      if (b==='branchB' && phys._coverB) { lines.find(l=>l.code==='MCHK').qty += phys._coverB; phys._coverB = 0; }
+      emit('USE', T(21), by(b==='branchA'?P.A:P.B,'branch'), { loc:b, lines });
+      if (rnd()<0.3) { const c='PLANT', q = r2(Math.min(get(b,c), U(0.3,1))); mv(b,null,c,q); emit('WASTE', T(21.1), by(b==='branchA'?P.A:P.B,'branch'), { loc:b, reason:'overripe', lines:[{code:c,qty:q}] }); }
+    }
+
+    // I4: storekeeper writes off good beef as spoiled
+    if (d===5 && on('I4')) { const s2 = open(T(17), 'Waste check', [P.store]); mv('store','outside','BEEF',3);
+      emit('WASTE', T(17.1), by(P.store,'storekeeper'), { loc:'store', reason:'spoiled', lines:[{code:'BEEF',qty:3}] }); close(T(17.2), s2);
+      inc('I4', d, 'Storekeeper takes 3 kg beef and records it as spoiled', val('BEEF',3), a => a.some(x=>x.code==='WRITE_OFF_UNWITNESSED' && x.refs.loc==='store') ? 'named' : null); }
+    // I13: night entry with a copied key, no session logged
+    if (d===6 && on('I13')) { mv('store','outside','PATTY',2);
+      inc('I13', d, 'Night entry with a copied key, nothing logged; 2 patty trays gone', val('PATTY',2), locMatch('store','PATTY',2,d)); }
+    // I9: storekeeper opens store late "to check freezer", takes chicken
+    if (d===10 && on('I9')) { const s2 = open(T(22), 'Check freezer', [P.store]); mv('store','outside','MCHK',1); close(T(22.3), s2);
+      inc('I9', d, 'Storekeeper opens store at night alone, takes 1 tray chicken', val('MCHK',1), a => a.some(x=>x.code==='IDLE_OPENING' && x.ts>=T(22)&&x.ts<T(23)) ? 'named' : null); }
+
+    // ---------- 21:30 blind counts
+    const counter = d===12 && on('I11') ? P.store : (d%2 ? P.turnkey : P.counter2);
+    if (d===12 && on('I11')) { mv('store','outside','OIL',4);
+      inc('I11', d, 'Storekeeper takes 4 L oil and does the count himself, entering the old figure', val('OIL',4), a => a.some(x=>x.code==='SELF_COUNT') && locMatch('store','OIL',4,d)(a) ? 'named' : a.some(x=>x.code==='SELF_COUNT') ? 'flag' : null); }
+    const cnt = (loc, who, custodian, cheat) => {
+      const codes = Object.keys(ITEMS).filter(c => get(loc,c)>0.001 || cheat&&cheat[c]);
+      const lines = codes.map(c => { let q = get(loc,c); if (rnd()<0.03) q = r2(q + (rnd()<0.5?-1:1)); if (cheat&&cheat[c]) q = r2(q+cheat[c]); return { code:c, qty:Math.max(0,q) }; });
+      emit('COUNT', T(21.5)+(who===P.store?0:1), by(who,'counter'), { loc, custodian, lines });
+      if (who===P.store) emit('COUNT', T(21.6), by(P.turnkey,'counter'), { loc, custodian, lines: codes.map(c=>({code:c,qty:get(loc,c)})) });
+    };
+    cnt('store', counter, P.store, d===12 && on('I11') ? { OIL:4 } : null);
+    cnt('branchA', P.A2, P.A); cnt('branchB', P.B2, P.B);
+  }
+
+  return { events, incidents, phys, end: (DAYS+1)*DAY };
+
+  function locMatch(loc, code, qty, day) {
+    return a => a.some(x => x.code==='COUNT_VARIANCE' && x.refs.loc===loc && x.ts >= day*DAY && x.ts < (day+2)*DAY && x.detail.split(', ').some(p => p.startsWith(code+' -') && Math.abs(parseFloat(p.split(' ')[1])) >= qty*0.6)) ? 'location' : null;
+  }
+}
+
+return { run, RECIPE };
+}
+if (typeof module !== 'undefined' && module.exports) { module.exports = makeSim; }
+
+(function () {
+  const E = window.StockEngine, SIM = makeSim(E);
+  const { ITEMS, LOCS } = E;
+  const $ = (s, el = document) => el.querySelector(s);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const naira = v => '₦' + Math.round(v).toLocaleString('en-NG');
+  const fmtT = ts => new Date(ts).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const shortId = p => p + '-' + Date.now().toString(36).slice(-4).toUpperCase() + Math.random().toString(36).slice(2, 4).toUpperCase();
+  const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+
+  const ROLES = {
+    turnkey: { label: 'Turnkey', tabs: ['alerts', 'reports', 'stock', 'log', 'sim'] },
+    storekeeper: { label: 'Storekeeper', tabs: ['store', 'count', 'reports', 'stock'] },
+    buyer: { label: 'Procurement', tabs: ['buy'] },
+    cook: { label: 'Kitchen', tabs: ['kitchen'] },
+    driver: { label: 'Driver', tabs: ['runs'] },
+    branch: { label: 'Branch', tabs: ['branch', 'count'] },
+  };
+  const TAB_LABEL = { alerts: 'Alerts', stock: 'Stock', log: 'Ledger', count: 'Blind count', sim: 'Simulation', store: 'Store', buy: 'Purchases', kitchen: 'Kitchen', runs: 'My runs', branch: 'Branch', reports: 'Reports' };
+
+  let me = store.get('stk-me') || null;          // {name, role, branch}
+  let tab = null, liveEvents = [], simEvents = null, simResult = null, db = null, uid = null, assets = null, dbState = 'connecting';
+  let flash = null, repDay = null, downloads = null;
+
+  const events = () => simEvents || liveEvents;
+  const now = () => simEvents ? simResult.end : Date.now();
+  const L = () => E.apply(events(), {}, now());
+
+  async function emit(type, payload) {
+    const e = Object.assign({ id: shortId('E'), ts: Date.now(), type, by: { name: me.name, role: me.role, uid } }, payload);
+    if (simEvents) { simEvents.push(e); render(); return e; }
+    if (!db) { toast('Not saved: the shared ledger is unavailable in this view.', true); throw new Error('no db'); }
+    try { await db.collection('events').doc(e.id).set(e); }
+    catch (err) { toast(err && err.code === 'invalid_argument' ? 'Not saved: your access is read-only.' : 'Not saved: ' + (err.message || err.code), true); throw err; }
+    return e;
+  }
+  function toast(msg, bad) { flash = { msg, bad }; render(); setTimeout(() => { flash = null; render(); }, 3800); }
+
+  // ---------- line editor
+  function lineEditor(id, codes, preset, blind) {
+    const rows = (preset && preset.length ? preset : [{ code: codes[0], qty: '' }]);
+    return `<div class="lines" id="${id}" data-codes="${codes.join(',')}">${rows.map(r => lineRow(codes, r, blind)).join('')}</div>
+      ${blind ? '' : `<button type="button" class="ghost add-line" data-for="${id}">Add item</button>`}`;
+  }
+  function lineRow(codes, r, blind) {
+    const sel = blind
+      ? `<span class="fixed" data-code="${r.code}">${esc(ITEMS[r.code].name)}</span>`
+      : `<select aria-label="Item">${codes.map(c => `<option value="${c}" ${c === r.code ? 'selected' : ''}>${esc(ITEMS[c].name)}</option>`).join('')}</select>`;
+    return `<div class="line">${sel}<input type="number" inputmode="decimal" min="0" step="0.5" aria-label="Quantity" value="${r.qty ?? ''}" placeholder="0"><span class="unit">${esc(ITEMS[r.code].unit)}</span>${blind ? '' : '<button type="button" class="x" aria-label="Remove line">×</button>'}</div>`;
+  }
+  function readLines(id) {
+    return [...document.querySelectorAll('#' + id + ' .line')].map(row => {
+      const code = row.querySelector('select') ? row.querySelector('select').value : row.querySelector('.fixed').dataset.code;
+      return { code, qty: Number(row.querySelector('input').value || 0) };
+    }).filter(l => l.qty > 0 || document.getElementById(id).dataset.blind);
+  }
+  const RAW = Object.keys(ITEMS).filter(c => ITEMS[c].kind === 'raw'), SEMI = Object.keys(ITEMS).filter(c => ITEMS[c].kind === 'semi'), ALL = Object.keys(ITEMS);
+
+  // ---------- views
+  function viewSetup() {
+    return `<section class="setup">
+      <h1>Who's using this phone?</h1>
+      <p class="lede">Every stock movement carries the name of the person who made it. Pick your role once; it stays on this device.</p>
+      <label>Your name<input id="su-name" autocomplete="name" value="${esc(me?.name || '')}"></label>
+      <fieldset class="roles"><legend>Your role</legend>${Object.entries(ROLES).map(([k, r]) => `<label class="pill"><input type="radio" name="su-role" value="${k}" ${me?.role === k ? 'checked' : ''}>${r.label}</label>`).join('')}</fieldset>
+      <label id="su-branch-wrap" class="${me?.role === 'branch' ? '' : 'hide'}">Branch<select id="su-branch">${E.BRANCHES.map(b => `<option value="${b}" ${me?.branch === b ? 'selected' : ''}>${LOCS[b]}</option>`).join('')}</select></label>
+      <button id="su-go" class="primary">Continue</button>
+    </section>`;
+  }
+
+  function sevDot(s) { return `<span class="sev sev-${s}" aria-label="${s} priority"></span>`; }
+
+  function viewAlerts(R) {
+    const hi = R.alerts.filter(a => a.sev === 'high'), med = R.alerts.filter(a => a.sev === 'med'), low = R.alerts.filter(a => a.sev === 'low');
+    const atRisk = hi.reduce((s, a) => s + a.value, 0);
+    const emerg = R.alerts.filter(a => a.code === 'EMERGENCY_RELEASE');
+    const list = arr => arr.length ? `<ul class="alerts">${arr.map(a => `<li>${sevDot(a.sev)}<div><b>${esc(a.title)}</b><span>${esc(a.detail)}</span><small>${fmtT(a.ts)}${a.accountable ? ' · check with ' + esc(a.accountable) : ''}</small></div>${a.value ? `<em>${naira(a.value)}</em>` : ''}</li>`).join('')}</ul>` : '<p class="empty">Nothing here.</p>';
+    return `<section>
+      <div class="headline"><div><span class="big">${hi.length}</span><span>need action today</span></div><div><span class="big">${naira(atRisk)}</span><span>stock value at risk</span></div><div><span class="big">${Object.keys(R.transit).length}</span><span>runs in transit</span></div></div>
+      <h2>Act on these</h2>${list(hi)}
+      <h2>Review</h2>${list(med)}
+      ${emerg.length ? `<p class="note">${emerg.length} emergency release${emerg.length > 1 ? 's' : ''} this period. If this keeps rising, the top-up process is being bypassed.</p>` : ''}
+      <details><summary>Low priority (${low.length})</summary>${list(low)}</details>
+    </section>`;
+  }
+
+  function viewStock(R) {
+    const locs = Object.keys(LOCS);
+    const codes = ALL.filter(c => locs.some(l => Math.abs((R.book[l] || {})[c] || 0) > 0.001));
+    const tr = Object.values(R.transit);
+    return `<section><h2>Book stock by location</h2>
+      <div class="scroll"><table><thead><tr><th>Item</th>${locs.map(l => `<th class="n">${LOCS[l]}</th>`).join('')}</tr></thead>
+      <tbody>${codes.map(c => `<tr><td>${esc(ITEMS[c].name)} <small>${ITEMS[c].unit}</small></td>${locs.map(l => { const q = (R.book[l] || {})[c] || 0; return `<td class="n ${q < -0.001 ? 'neg' : ''}">${q ? q : '·'}</td>`; }).join('')}</tr>`).join('') || `<tr><td colspan="5" class="empty">No stock recorded yet. The first goods received will appear here.</td></tr>`}</tbody></table></div>
+      <h2>In transit</h2>${tr.length ? `<ul class="plain">${tr.map(t => `<li><b>${esc(t.release.movId)}</b> to ${LOCS[t.release.dest]} with ${esc(t.release.carrier)} · left ${fmtT(t.release.ts)}</li>`).join('')}</ul>` : '<p class="empty">Nothing on the road.</p>'}
+    </section>`;
+  }
+
+  const EV_LABEL = { PURCHASE: 'Purchase logged', GRN: 'Goods received', REQUEST: 'Request', RELEASE: 'Released', RECEIPT: 'Received at branch', YIELD: 'Yield reported', USE: 'Usage (sales)', WASTE: 'Write-off', COUNT: 'Blind count', STORE_OPEN: 'Store opened', STORE_CLOSE: 'Store closed', CORRECTION: 'Correction' };
+  function evSummary(e) {
+    const ln = ls => (ls || []).map(l => `${l.qty} ${l.code}`).join(', ');
+    switch (e.type) {
+      case 'PURCHASE': case 'GRN': return `${e.poId} · ${ln(e.lines)}`;
+      case 'REQUEST': return `${e.reqId} for ${LOCS[e.dest] || e.dest} (${e.kind}) · ${ln(e.lines)}`;
+      case 'RELEASE': return `${e.movId} to ${LOCS[e.dest]}${e.carrier ? ' with ' + e.carrier : ''}${e.reqId ? '' : ' · no request'} · ${ln(e.lines)}`;
+      case 'RECEIPT': return `${e.movId} · ${ln(e.lines)}${e.photoId || e.photo ? ' · photo' : ''}`;
+      case 'YIELD': return `${e.batchId} · in ${ln(e.inputs)} · out ${ln(e.outputs)}`;
+      case 'USE': case 'WASTE': return `${LOCS[e.loc]} · ${ln(e.lines)}${e.reason ? ' · ' + e.reason : ''}${e.witness ? ' · witness ' + e.witness : ''}`;
+      case 'COUNT': return `${LOCS[e.loc]} · ${e.lines.length} items`;
+      case 'STORE_OPEN': return `${e.reason} · present: ${(e.present || []).join(', ')}`;
+      default: return e.sessionId || e.refId || '';
+    }
+  }
+  function viewLog() {
+    const ev = events().slice().sort((a, b) => b.ts - a.ts).slice(0, 300);
+    return `<section><h2>Ledger</h2><p class="lede">Every entry, newest first. Entries are never edited; mistakes are fixed with a correction.</p>
+      <ol class="log">${ev.map(e => `<li><time>${fmtT(e.ts)}</time><b>${EV_LABEL[e.type] || e.type}</b><span>${esc(evSummary(e))}</span><small>${esc(e.by?.name)} · ${esc(e.by?.role)}</small></li>`).join('') || '<li class="empty">No entries yet.</li>'}</ol></section>`;
+  }
+
+  function openSession(R) { const s = Object.entries(R.sessions).find(([, v]) => !v.close); return s ? s[0] : null; }
+
+  function viewStore(R) {
+    const sid = openSession(R);
+    const pendingPO = Object.values(R.purchases).filter(p => !R.grns[p.poId]);
+    const releasedReq = new Set(Object.values(R.releases).map(r => r.reqId).filter(Boolean));
+    const reqs = Object.values(R.requests).filter(q => !releasedReq.has(q.reqId)).sort((a, b) => a.ts - b.ts);
+    const sessionCard = sid
+      ? `<div class="card open"><h3>Store is open</h3><p>Opened ${fmtT(R.sessions[sid].open.ts)} for "${esc(R.sessions[sid].open.reason)}". Present: ${esc((R.sessions[sid].open.present || []).join(', '))}.</p><button class="primary" data-act="close-store" data-sid="${sid}">Close and lock store</button></div>`
+      : `<div class="card"><h3>Store is locked</h3><label>Reason for opening<input id="op-reason" placeholder="Morning dispatch, delivery, top-up…"></label><label>Who else is present<input id="op-present" placeholder="Names, comma separated"></label><button class="primary" data-act="open-store">Open store</button></div>`;
+    return `<section>${sessionCard}
+      <h2>Deliveries to receive</h2>
+      ${pendingPO.length ? pendingPO.map(p => `<div class="card"><h3>${esc(p.poId)} from ${esc(p.supplier || 'supplier')}</h3><p class="lede">Count what actually arrived. The purchase quantities are hidden on purpose.</p>${lineEditor('grn-' + p.poId, ALL, p.lines.map(l => ({ code: l.code, qty: '' })), true)}<button class="primary" data-act="grn" data-po="${esc(p.poId)}">Confirm goods received</button></div>`).join('') : '<p class="empty">No purchases waiting.</p>'}
+      <h2>Requests to release</h2>
+      ${reqs.length ? reqs.map(q => `<div class="card"><h3>${esc(q.reqId)} · ${LOCS[q.dest]} <small>${esc(q.kind)}, raised by ${esc(q.by.name)}</small></h3>${lineEditor('rel-' + q.reqId, ALL, q.lines)}
+        ${q.dest === 'kitchen' ? `<label>Handed to (cook)<input id="rel-to-${q.reqId}" value="${esc(q.by.name)}"></label>` : `<label>Driver carrying it<input id="rel-to-${q.reqId}" value="${esc(store.get('stk-driver') || '')}"></label>`}
+        <button class="primary" data-act="release" data-req="${esc(q.reqId)}">Release stock</button></div>`).join('') : '<p class="empty">No open requests.</p>'}
+      <details class="card"><summary>Emergency release without a request</summary><p class="lede">Only when it cannot wait. Every one goes on the turnkey's review list.</p>
+        <label>Destination<select id="em-dest">${E.BRANCHES.map(b => `<option value="${b}">${LOCS[b]}</option>`).join('')}</select></label>
+        <label>Reason<input id="em-reason"></label><label>Driver<input id="em-driver" value="${esc(store.get('stk-driver') || '')}"></label>
+        ${lineEditor('em-lines', ALL)}<button class="danger" data-act="emergency">Release as emergency</button></details>
+      <details class="card"><summary>Write off spoiled or damaged stock</summary>
+        ${lineEditor('wo-lines', ALL)}<label>Reason<input id="wo-reason"></label><label>Witness (a second person who saw it)<input id="wo-witness"></label>
+        <button data-act="writeoff" data-loc="store">Record write-off</button></details>
+    </section>`;
+  }
+
+  function viewBuy(R) {
+    const mine = Object.values(R.purchases).sort((a, b) => b.ts - a.ts);
+    const mism = new Set(R.alerts.filter(a => a.code === 'GRN_MISMATCH').map(a => a.refs.poId));
+    return `<section><div class="card"><h3>Log a purchase</h3><label>Supplier<input id="po-supplier"></label>${lineEditor('po-lines', RAW)}<button class="primary" data-act="purchase">Log purchase</button></div>
+      <h2>Purchases</h2><ul class="plain">${mine.map(p => `<li><b>${esc(p.poId)}</b> ${esc(p.supplier || '')} · ${fmtT(p.ts)} · ${R.grns[p.poId] ? (mism.has(p.poId) ? '<span class="tag bad">Received with differences</span>' : '<span class="tag ok">Received</span>') : '<span class="tag">Awaiting storekeeper</span>'}</li>`).join('') || '<li class="empty">No purchases yet.</li>'}</ul></section>`;
+  }
+
+  function viewKitchen(R) {
+    const open = Object.values(R.releases).filter(r => r.dest === 'kitchen' && !R.yields.some(y => (y.issueIds || []).includes(r.movId)));
+    return `<section><div class="card"><h3>Request ingredients</h3>${lineEditor('kr-lines', RAW)}<button class="primary" data-act="kreq">Send request to store</button></div>
+      <h2>Report yield</h2>${open.length ? open.map(r => `<div class="card"><h3>${esc(r.movId)} <small>issued ${fmtT(r.ts)}</small></h3><p class="lede">What went in</p>${lineEditor('yi-' + r.movId, RAW, r.lines)}<p class="lede">What came out</p>${lineEditor('yo-' + r.movId, SEMI)}<button class="primary" data-act="yield" data-mov="${esc(r.movId)}">Report yield</button></div>`).join('') : '<p class="empty">No ingredients waiting for a yield report.</p>'}</section>`;
+  }
+
+  function viewBranch(R) {
+    const b = me.branch || 'branchA';
+    const incoming = Object.values(R.transit).filter(t => t.release.dest === b);
+    return `<section><h2>${LOCS[b]}</h2>
+      ${incoming.length ? incoming.map(t => `<div class="card open"><h3>Delivery ${esc(t.release.movId)} <small>with ${esc(t.release.carrier)}</small></h3><p class="lede">Count it at the door with the driver. Quantities sent are hidden on purpose.</p>${lineEditor('rc-' + t.release.movId, ALL, t.lines.map(l => ({ code: l.code, qty: '' })), true)}
+        <label>Note<input id="rc-note-${t.release.movId}" placeholder="Damage, anything odd"></label>
+        ${assets ? `<label>Photo of the crates<input type="file" accept="image/*" capture="environment" id="rc-photo-${t.release.movId}"></label>` : `<label class="check"><input type="checkbox" id="rc-photo-${t.release.movId}"> Crates photographed</label>`}
+        <button class="primary" data-act="receive" data-mov="${esc(t.release.movId)}">Confirm received</button></div>`).join('') : '<p class="empty">No deliveries on the way.</p>'}
+      <div class="card"><h3>Request stock</h3><label>Type<select id="br-kind"><option value="planned">Planned delivery</option><option value="topup">Top-up (urgent)</option></select></label>${lineEditor('br-lines', ALL)}<button class="primary" data-act="breq">Send request</button></div>
+      <details class="card"><summary>End of day usage from the till</summary>${lineEditor('use-lines', ALL)}<button data-act="use">Record usage</button></details>
+      <details class="card"><summary>Write off spoiled stock</summary>${lineEditor('bwo-lines', ALL)}<label>Reason<input id="bwo-reason"></label><label>Witness<input id="bwo-witness"></label><button data-act="writeoff" data-loc="${b}">Record write-off</button></details>
+    </section>`;
+  }
+
+  function viewRuns(R) {
+    const mine = Object.values(R.releases).filter(r => r.carrier && r.carrier.toLowerCase() === me.name.toLowerCase()).sort((a, b) => b.ts - a.ts);
+    return `<section><h2>My runs</h2><p class="lede">The branch confirms what arrived. You can see your runs but not confirm them yourself.</p>
+      <ul class="plain">${mine.map(r => `<li><b>${esc(r.movId)}</b> to ${LOCS[r.dest]} · ${fmtT(r.ts)} · ${R.receipts[r.movId] ? '<span class="tag ok">Received</span>' : '<span class="tag">On the road</span>'}<br><small>${r.lines.map(l => l.qty + ' ' + ITEMS[l.code].unit + ' ' + ITEMS[l.code].name).join(', ')}</small></li>`).join('') || '<li class="empty">No runs under your name yet.</li>'}</ul></section>`;
+  }
+
+  function viewCount(R) {
+    const locs = me.role === 'branch' ? [me.branch || 'branchA'] : Object.keys(LOCS);
+    const sel = store.get('stk-countloc') && locs.includes(store.get('stk-countloc')) ? store.get('stk-countloc') : locs[0];
+    return `<section><h2>Blind count</h2><p class="lede">Count what is physically there. Expected figures stay hidden until you submit.</p>
+      <label>Location<select id="ct-loc">${locs.map(l => `<option value="${l}" ${l === sel ? 'selected' : ''}>${LOCS[l]}</option>`).join('')}</select></label>
+      ${lineEditor('ct-lines', ALL, ALL.map(c => ({ code: c, qty: '' })), true)}
+      <button class="primary" data-act="count">Submit count</button></section>`;
+  }
+
+  function viewSim() {
+    if (!simResult) return `<section><h2>Simulated fortnight</h2><p class="lede">Runs 14 days of normal operations for the central kitchen and two branches, with 13 planted thefts and errors, then shows what the ledger caught. Nothing is written to the real ledger.</p><button class="primary" data-act="sim-run">Run simulation</button></section>`;
+    const out = E.apply(simResult.events, simResult.rules, simResult.end);
+    const tag = { named: '<span class="tag ok">Caught, person named</span>', location: '<span class="tag warn">Caught at location</span>', flag: '<span class="tag warn">Flagged only</span>' };
+    let caught = 0, total = 0;
+    const rows = simResult.incidents.map(i => { const m = i.match(out.alerts); total += i.loss; if (m === 'named' || m === 'location') caught += i.loss; return `<tr><td class="n">${i.day}</td><td>${esc(i.title)}</td><td class="n">${naira(i.loss)}</td><td>${tag[m] || '<span class="tag bad">Missed</span>'}</td></tr>`; }).join('');
+    return `<section><h2>Simulated fortnight</h2>
+      <div class="headline"><div><span class="big">${naira(caught)}</span><span>of ${naira(total)} stolen surfaced</span></div><div><span class="big">${simResult.events.length}</span><span>ledger entries</span></div></div>
+      <label class="check"><input type="checkbox" id="sim-yield" ${simResult.withYield ? 'checked' : ''}> Use yield standards (not agreed yet)</label>
+      <div class="scroll"><table><thead><tr><th class="n">Day</th><th>What happened</th><th class="n">Loss</th><th>Result</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="note">The whole app is now showing the simulated ledger. Switch roles or open Alerts to explore it.</p>
+      <button data-act="sim-exit">Back to the real ledger</button></section>`;
+  }
+
+
+  // ---------- reports
+  const dayKey = ts => { const d = new Date(ts); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const dayRange = k => { const [y, m, d] = k.split('-').map(Number); const a = new Date(y, m - 1, d).getTime(); return [a, new Date(y, m - 1, d + 1).getTime()]; };
+  const dayLabel = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: simEvents ? undefined : 'numeric' }); };
+
+  function buildReports(k) {
+    const [a, b] = dayRange(k), ev = events();
+    const before = E.apply(ev.filter(e => e.ts < a), {}, a), after = E.apply(ev.filter(e => e.ts < b), {}, b - 1);
+    const today = ev.filter(e => e.ts >= a && e.ts < b);
+    const flow = {}; const f = (loc, c, dir, q) => { const k2 = loc + '|' + c; (flow[k2] = flow[k2] || { in: 0, out: 0 })[dir] += q; };
+    today.forEach(e => {
+      const ls = e.lines || [];
+      if (e.type === 'GRN') ls.forEach(l => f('store', l.code, 'in', l.qty));
+      if (e.type === 'RELEASE') ls.forEach(l => { f('store', l.code, 'out', l.qty); if (e.dest === 'kitchen') f('kitchen', l.code, 'in', l.qty); });
+      if (e.type === 'RECEIPT') { const r = after.releases[e.movId]; if (r) ls.forEach(l => f(r.dest, l.code, 'in', l.qty)); }
+      if (e.type === 'YIELD') { (e.inputs || []).forEach(l => f('kitchen', l.code, 'out', l.qty)); (e.outputs || []).forEach(l => f('store', l.code, 'in', l.qty)); }
+      if (e.type === 'USE' || e.type === 'WASTE') ls.forEach(l => f(e.loc, l.code, 'out', l.qty));
+    });
+    const r2 = x => Math.round(x * 100) / 100;
+    const stock = {};
+    Object.keys(LOCS).forEach(loc => {
+      const rows = ALL.map(c => {
+        const op = (before.book[loc] || {})[c] || 0, cl = (after.book[loc] || {})[c] || 0, fl = flow[loc + '|' + c] || { in: 0, out: 0 };
+        return { code: c, opening: r2(op), in: r2(fl.in), out: r2(fl.out), gap: r2(cl - op - fl.in + fl.out), closing: r2(cl), value: cl * ITEMS[c].price };
+      }).filter(r => r.opening || r.in || r.out || r.closing || r.gap);
+      stock[loc] = { rows, value: rows.reduce((s, r) => s + Math.max(0, r.value), 0) };
+    });
+    const V = ls => E.value(ls || []);
+    const rel = today.filter(e => e.type === 'RELEASE' && e.dest !== 'kitchen');
+    const kind = r => !r.reqId ? 'emergency' : (after.requests[r.reqId] || {}).kind || 'planned';
+    const dayAlerts = after.alerts.filter(x => x.ts >= a && x.ts < b && x.sev !== 'low');
+    const transitOpen = Object.values(after.transit).map(t => t.release);
+    const eod = {
+      purchases: today.filter(e => e.type === 'GRN').length,
+      receivedValue: today.filter(e => e.type === 'GRN').reduce((s, e) => s + V(e.lines), 0),
+      planned: rel.filter(r => kind(r) === 'planned').length, topups: rel.filter(r => kind(r) === 'topup').length, emergency: rel.filter(r => kind(r) === 'emergency').length,
+      sentValue: rel.reduce((s, e) => s + V(e.lines), 0),
+      confirmed: today.filter(e => e.type === 'RECEIPT').length, transitOpen,
+      sales: E.BRANCHES.map(bb => ({ loc: bb, value: today.filter(e => e.type === 'USE' && e.loc === bb).reduce((s, e) => s + V(e.lines), 0) })),
+      waste: today.filter(e => e.type === 'WASTE').reduce((s, e) => s + V(e.lines), 0),
+      batches: today.filter(e => e.type === 'YIELD').length,
+      counts: today.filter(e => e.type === 'COUNT').map(e => e.loc),
+      countLoss: dayAlerts.filter(x => x.code === 'COUNT_VARIANCE').reduce((s, x) => s + x.value, 0),
+      openings: today.filter(e => e.type === 'STORE_OPEN').length,
+      leftOpen: Object.values(after.sessions).filter(x => !x.close).length,
+      alerts: dayAlerts,
+    };
+    return { stock, eod, k };
+  }
+
+  function viewReports() {
+    const days = [...new Set(events().map(e => dayKey(e.ts)))].sort().reverse();
+    if (!days.length) return `<section><h2>Reports</h2><p class="empty">Reports appear once the first entries are saved. To preview them now, run the simulation from the turnkey's Simulation tab.</p></section>`;
+    if (!days.includes(repDay)) repDay = days[0];
+    const { stock, eod } = buildReports(repDay);
+    const total = Object.values(stock).reduce((s, x) => s + x.value, 0);
+    const missingCounts = Object.keys(LOCS).filter(l => l !== 'kitchen' && !eod.counts.includes(l));
+    const num = x => x ? x : '·';
+    const stockTables = Object.keys(LOCS).filter(l => stock[l].rows.length).map(l => `
+      <h3 class="rep-h">${LOCS[l]} <small>${naira(stock[l].value)}</small></h3>
+      <div class="scroll"><table><thead><tr><th>Item</th><th class="n">Opening</th><th class="n">In</th><th class="n">Out</th><th class="n">Count gap</th><th class="n">Closing</th></tr></thead><tbody>
+      ${stock[l].rows.map(r => `<tr><td>${esc(ITEMS[r.code].name)} <small>${ITEMS[r.code].unit}</small></td><td class="n">${num(r.opening)}</td><td class="n">${num(r.in)}</td><td class="n">${num(r.out)}</td><td class="n ${r.gap < 0 ? 'neg' : ''}">${r.gap ? (r.gap > 0 ? '+' : '') + r.gap : '·'}</td><td class="n"><b>${num(r.closing)}</b></td></tr>`).join('')}
+      </tbody></table></div>`).join('');
+    const sales = eod.sales.map(s => `${LOCS[s.loc]} ${naira(s.value)}`).join(' · ');
+    return `<section>
+      <h2>Reports</h2>
+      <label>Day<select id="rep-day">${days.map(d => `<option value="${d}" ${d === repDay ? 'selected' : ''}>${dayLabel(d)}</option>`).join('')}</select></label>
+
+      <h2>End of day</h2>
+      <div class="headline"><div><span class="big">${eod.alerts.filter(x => x.sev === 'high').length}</span><span>problems to act on</span></div><div><span class="big">${naira(eod.countLoss)}</span><span>lost in count gaps</span></div><div><span class="big">${eod.transitOpen.length}</span><span>runs not yet received</span></div></div>
+      <div class="scroll"><table><tbody>
+        <tr><th>Goods received</th><td>${eod.purchases} deliver${eod.purchases === 1 ? 'y' : 'ies'} · ${naira(eod.receivedValue)}</td></tr>
+        <tr><th>Kitchen</th><td>${eod.batches} yield report${eod.batches === 1 ? '' : 's'}</td></tr>
+        <tr><th>Runs to branches</th><td>${eod.planned} planned · ${eod.topups} top-up · <span class="${eod.emergency ? 'neg' : ''}">${eod.emergency} emergency</span> · ${naira(eod.sentValue)} sent</td></tr>
+        <tr><th>Confirmed at branches</th><td>${eod.confirmed}${eod.transitOpen.length ? ` · <span class="neg">still open: ${eod.transitOpen.map(r => esc(r.movId) + ' (' + esc(r.carrier) + ')').join(', ')}</span>` : ''}</td></tr>
+        <tr><th>Usage from tills</th><td>${sales}</td></tr>
+        <tr><th>Write-offs</th><td>${naira(eod.waste)}</td></tr>
+        <tr><th>Store openings</th><td>${eod.openings}${eod.leftOpen ? ' · <span class="neg">left open</span>' : ''}</td></tr>
+        <tr><th>Blind counts</th><td>${eod.counts.length ? eod.counts.map(l => LOCS[l]).filter((v, i, a) => a.indexOf(v) === i).join(', ') : 'none'}${missingCounts.length ? ` · <span class="neg">missing: ${missingCounts.map(l => LOCS[l]).join(', ')}</span>` : ''}</td></tr>
+      </tbody></table></div>
+      ${eod.alerts.length ? `<ul class="alerts" style="margin-top:12px">${eod.alerts.map(x => `<li>${sevDot(x.sev)}<div><b>${esc(x.title)}</b><span>${esc(x.detail)}</span>${x.accountable ? `<small>check with ${esc(x.accountable)}</small>` : ''}</div>${x.value ? `<em>${naira(x.value)}</em>` : ''}</li>`).join('')}</ul>` : '<p class="empty">No problems recorded this day.</p>'}
+
+      <h2>Daily stock <small>closing value ${naira(total)}</small></h2>
+      <p class="lede">Opening plus in, minus out, plus any count gap gives the closing figure. A negative gap is stock that went missing.</p>
+      ${stockTables}
+      ${downloads ? `<div class="actions"><button data-act="dl-stock">Download stock (CSV)</button><button data-act="dl-eod">Download end of day (CSV)</button></div>` : ''}
+    </section>`;
+  }
+
+  function csv(rows) { return rows.map(r => r.map(v => { const s = String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(',')).join('\n'); }
+  async function save(name, text) {
+    try { await downloads.save({ filename: name, data: text }); }
+    catch (e) { if (e && e.code !== 'declined') toast('Download failed: ' + (e.message || e.code), true); }
+  }
+
+  // ---------- render
+  function render() {
+    const app = $('#app');
+    if (!me || !me.name || !me.role) { app.innerHTML = viewSetup(); wireSetup(); return; }
+    const role = ROLES[me.role] || ROLES.turnkey; if (!role.tabs.includes(tab)) tab = role.tabs[0];
+    let R; try { R = L(); } catch (e) { R = E.apply([], {}, Date.now()); }
+    const body = { alerts: viewAlerts, stock: viewStock, log: viewLog, store: viewStore, buy: viewBuy, kitchen: viewKitchen, branch: viewBranch, runs: viewRuns, count: viewCount, sim: viewSim, reports: viewReports }[tab](R);
+    const hiCount = R.alerts.filter(a => a.sev === 'high').length;
+    app.innerHTML = `
+      <header><div class="brand">Stock ledger</div><button class="me" data-act="switch">${esc(me.name)} · ${role.label}${me.role === 'branch' ? ' · ' + LOCS[me.branch] : ''}</button></header>
+      ${simEvents ? '<div class="banner">Simulated data — nothing here is real or saved</div>' : dbState !== 'ok' ? `<div class="banner warn">${dbState === 'connecting' ? 'Connecting to the shared ledger…' : 'The shared ledger is unavailable here, so entries cannot be saved. Open this page in Claude while signed in.'}</div>` : ''}
+      <main>${body}</main>
+      <nav>${role.tabs.map(t => `<button class="${t === tab ? 'on' : ''}" data-tab="${t}">${TAB_LABEL[t]}${t === 'alerts' && hiCount ? ` <span class="badge">${hiCount}</span>` : ''}</button>`).join('')}</nav>
+      ${flash ? `<div class="toast ${flash.bad ? 'bad' : ''}" role="status">${esc(flash.msg)}</div>` : ''}`;
+  }
+
+  function wireSetup() {
+    document.querySelectorAll('input[name=su-role]').forEach(r => r.onchange = () => $('#su-branch-wrap').classList.toggle('hide', r.value !== 'branch' || !r.checked));
+    $('#su-go').onclick = () => {
+      const name = $('#su-name').value.trim(), role = (document.querySelector('input[name=su-role]:checked') || {}).value;
+      if (!name || !role) { $('#su-go').textContent = 'Enter your name and pick a role'; return; }
+      me = { name, role, branch: $('#su-branch').value }; store.set('stk-me', me); tab = null; render();
+    };
+  }
+
+  document.addEventListener('click', async ev => {
+    const t = ev.target.closest('button'); if (!t) return;
+    if (t.dataset.tab) { tab = t.dataset.tab; render(); return; }
+    if (t.classList.contains('add-line')) { const box = document.getElementById(t.dataset.for); const codes = box.dataset.codes.split(','); box.insertAdjacentHTML('beforeend', lineRow(codes, { code: codes[0], qty: '' })); return; }
+    if (t.classList.contains('x')) { const line = t.closest('.line'); if (line.parentElement.children.length > 1) line.remove(); else line.querySelector('input').value = ''; return; }
+    const a = t.dataset.act; if (!a) return;
+    const R = L(); const need = (cond, msg) => { if (!cond) { toast(msg, true); throw 0; } };
+    try {
+      t.disabled = true;
+      if (a === 'switch') { me = { ...me, role: null }; render(); return; }
+      if (a === 'open-store') { need($('#op-reason').value.trim(), 'Give a reason for opening the store.');
+        await emit('STORE_OPEN', { sessionId: shortId('S'), reason: $('#op-reason').value.trim(), present: [me.name, ...$('#op-present').value.split(',').map(s => s.trim()).filter(Boolean)] }); toast('Store opened and logged.'); }
+      if (a === 'close-store') { await emit('STORE_CLOSE', { sessionId: t.dataset.sid }); toast('Store closed.'); }
+      if (a === 'purchase') { const lines = readLines('po-lines'); need(lines.length, 'Add at least one item with a quantity.');
+        await emit('PURCHASE', { poId: shortId('PO'), supplier: $('#po-supplier').value.trim(), lines }); toast('Purchase logged. The storekeeper confirms what arrives.'); }
+      if (a === 'grn') { need(openSession(R), 'Open the store first.'); const lines = readLines('grn-' + t.dataset.po).filter(l => l.qty > 0);
+        await emit('GRN', { poId: t.dataset.po, lines }); toast('Goods received.'); }
+      if (a === 'release') { need(openSession(R), 'Open the store first.'); const q = R.requests[t.dataset.req]; const lines = readLines('rel-' + q.reqId); const who = $('#rel-to-' + q.reqId).value.trim();
+        need(lines.length, 'Nothing to release.'); need(who, q.dest === 'kitchen' ? 'Name the cook receiving it.' : 'Name the driver carrying it.');
+        const p = { movId: shortId('MOV'), reqId: q.reqId, dest: q.dest, lines }; if (q.dest === 'kitchen') p.receivedBy = who; else { p.carrier = who; store.set('stk-driver', who); }
+        await emit('RELEASE', p); toast('Released ' + p.movId + '.'); }
+      if (a === 'emergency') { need(openSession(R), 'Open the store first.'); const lines = readLines('em-lines'); need(lines.length, 'Add items.'); need($('#em-reason').value.trim(), 'Give the reason.'); need($('#em-driver').value.trim(), 'Name the driver.');
+        await emit('RELEASE', { movId: shortId('MOV'), reqId: null, dest: $('#em-dest').value, reason: $('#em-reason').value.trim(), carrier: $('#em-driver').value.trim(), lines }); toast('Emergency release logged for review.'); }
+      if (a === 'writeoff') { const pre = t.dataset.loc === 'store' ? 'wo' : 'bwo'; const lines = readLines(pre + '-lines'); need(lines.length, 'Add items.'); need($('#' + pre + '-reason').value.trim(), 'Give the reason.');
+        await emit('WASTE', { loc: t.dataset.loc, lines, reason: $('#' + pre + '-reason').value.trim(), witness: $('#' + pre + '-witness').value.trim() }); toast('Write-off recorded.'); }
+      if (a === 'kreq') { const lines = readLines('kr-lines'); need(lines.length, 'Add items.'); await emit('REQUEST', { reqId: shortId('REQ'), dest: 'kitchen', kind: 'production', lines }); toast('Request sent to store.'); }
+      if (a === 'yield') { const m = t.dataset.mov; const outputs = readLines('yo-' + m); need(outputs.length, 'Enter what came out.');
+        await emit('YIELD', { batchId: shortId('B'), issueIds: [m], inputs: readLines('yi-' + m), outputs }); toast('Yield reported.'); }
+      if (a === 'breq') { const lines = readLines('br-lines'); need(lines.length, 'Add items.'); await emit('REQUEST', { reqId: shortId('REQ'), branch: me.branch, dest: me.branch, kind: $('#br-kind').value, lines }); toast('Request sent.'); }
+      if (a === 'receive') { const m = t.dataset.mov; const lines = readLines('rc-' + m).map(l => ({ ...l, status: 'counted' })); const f = $('#rc-photo-' + m);
+        let photo = false, photoId = null;
+        if (assets && f.files && f.files[0]) { try { const up = await assets.upload(f.files[0]); photoId = up.id; photo = true; } catch (e) { toast('Photo did not upload; receipt saved without it.', true); } }
+        else if (f.type === 'checkbox') photo = f.checked;
+        await emit('RECEIPT', { movId: m, lines, note: $('#rc-note-' + m).value.trim(), photo, photoId }); toast('Delivery confirmed.'); }
+      if (a === 'use') { const lines = readLines('use-lines'); need(lines.length, 'Add items.'); await emit('USE', { loc: me.branch, lines }); toast('Usage recorded.'); }
+      if (a === 'count') { const loc = $('#ct-loc').value; const lines = readLines('ct-lines').filter(l => l.qty >= 0);
+        const custodian = loc === 'store' ? (Object.values(R.sessions).slice(-1)[0] || { open: { by: {} } }).open.by.name : loc === 'kitchen' ? null : (Object.values(R.receipts).filter(r => R.releases[r.movId]?.dest === loc).slice(-1)[0] || { by: {} }).by.name;
+        await emit('COUNT', { loc, custodian, lines }); const after = L(); const c = after.counts[after.counts.length - 1];
+        toast(c.held ? 'Count held: you look after this stock, so someone else must count it.' : c.variances.length ? `${c.variances.length} item${c.variances.length > 1 ? 's' : ''} differ from the book. The turnkey has been alerted.` : 'Count matches the book.'); }
+      if (a === 'sim-run' || a === 'sim-toggle') { runSim(false); }
+      if (a === 'dl-stock') { const { stock } = buildReports(repDay);
+        const rows = [['Date', 'Location', 'Item', 'Unit', 'Opening', 'In', 'Out', 'Count gap', 'Closing', 'Closing value (NGN)']];
+        Object.keys(stock).forEach(l => stock[l].rows.forEach(r => rows.push([repDay, LOCS[l], ITEMS[r.code].name, ITEMS[r.code].unit, r.opening, r.in, r.out, r.gap, r.closing, Math.round(r.value)])));
+        await save('daily-stock-' + repDay + '.csv', csv(rows)); }
+      if (a === 'dl-eod') { const { eod } = buildReports(repDay);
+        const rows = [['Date', repDay], ['Goods received', eod.purchases, Math.round(eod.receivedValue)], ['Planned runs', eod.planned], ['Top-up runs', eod.topups], ['Emergency releases', eod.emergency], ['Value sent to branches (NGN)', Math.round(eod.sentValue)], ['Confirmed at branches', eod.confirmed], ['Runs not received', eod.transitOpen.map(r => r.movId + ' ' + r.carrier).join('; ')],
+          ...eod.sales.map(x => ['Till usage ' + LOCS[x.loc] + ' (NGN)', Math.round(x.value)]), ['Write-offs (NGN)', Math.round(eod.waste)], ['Count gaps lost (NGN)', Math.round(eod.countLoss)], ['Store openings', eod.openings], [], ['Priority', 'Problem', 'Detail', 'Check with', 'Value (NGN)'],
+          ...eod.alerts.map(x => [x.sev, x.title, x.detail, x.accountable || '', x.value])];
+        await save('end-of-day-' + repDay + '.csv', csv(rows)); }
+      if (a === 'sim-exit') { simEvents = null; simResult = null; render(); }
+    } catch (e) { if (e !== 0) console.error(e); }
+    finally { t.disabled = false; }
+  });
+  document.addEventListener('change', ev => {
+    if (ev.target.id === 'sim-yield') runSim(ev.target.checked);
+    if (ev.target.id === 'rep-day') { repDay = ev.target.value; render(); }
+    if (ev.target.id === 'ct-loc') store.set('stk-countloc', ev.target.value);
+  });
+  function runSim(withYield) {
+    const ALLI = ['I1', 'I2', 'I2b', 'I3', 'I4', 'I5', 'I6', 'I7', 'I8', 'I9', 'I10', 'I11', 'I12', 'I13'];
+    const r = SIM.run(42, new Set(ALLI));
+    simResult = { ...r, withYield, rules: withYield ? { yieldStandards: SIM.RECIPE } : {} };
+    simEvents = r.events; render();
+  }
+
+  render();
+
+  // ---------- live ledger
+  (async () => {
+    try {
+      const u = await claude.use('user'); if (u) uid = await u.id();
+      db = await claude.use('db');
+      try { assets = await claude.use('assets'); } catch (e) { assets = null; }
+      try { downloads = await claude.use('downloads'); } catch (e) { downloads = null; }
+      if (!db) { dbState = 'off'; render(); return; }
+      db.collection('events').onSnapshot(snap => { liveEvents = snap.docs.map(d => d.data()); dbState = 'ok'; if (!simEvents) render(); else render(); },
+        err => { dbState = 'off'; render(); });
+    } catch (e) { dbState = 'off'; render(); }
+  })();
+  setTimeout(() => { if (dbState === 'connecting') { dbState = 'off'; render(); } }, 12000);
+})();
+</script></body></html>

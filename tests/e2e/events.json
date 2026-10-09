@@ -1,0 +1,489 @@
+[
+ {
+  "seq": 1,
+  "type": "STORE_OPEN",
+  "occurred_at": "2026-10-09T16:39:54.925Z",
+  "recorded_at": "2026-10-09T16:39:54.925Z",
+  "actor_id": "bd6406f0-5985-4a0e-9fc6-9bbcd6267784",
+  "actor_name": "Musa",
+  "actor_role": "storekeeper",
+  "location_id": "store",
+  "source": "app",
+  "paper_page": null,
+  "data": {
+   "reason": "Morning delivery",
+   "present": [
+    "Musa",
+    "Tunde"
+   ],
+   "sessionId": "S-00001"
+  }
+ },
+ {
+  "seq": 2,
+  "type": "PURCHASE",
+  "occurred_at": "2026-10-09T16:39:54.935Z",
+  "recorded_at": "2026-10-09T16:39:54.935Z",
+  "actor_id": "0f7a81a0-84b5-4689-885c-6603f5654e8f",
+  "actor_name": "Tunde",
+  "actor_role": "buyer",
+  "location_id": "store",
+  "source": "app",
+  "paper_page": null,
+  "data": {
+   "poId": "PO-00001",
+   "lines": [
+    {
+     "qty": 20,
+     "code": "chicken",
+     "unitPrice": 4500
+    },
+    {
+     "qty": 2,
+     "code": "vegetable-oil",
+     "unitPrice": null,
+     "purchaseQty": 2
+    }
+   ],
+   "supplier": "Mile 12",
+   "invoicePhoto": null
+  }
+ },
+ {
+  "seq": 3,
+  "type": "GRN",
+  "occurred_at": "2026-10-09T16:39:54.944Z",
+  "recorded_at": "2026-10-09T16:39:54.944Z",
+  "actor_id": "bd6406f0-5985-4a0e-9fc6-9bbcd6267784",
+  "actor_name": "Musa",
+  "actor_role": "storekeeper",
+  "location_id": "store",
+  "source": "app",
+  "paper_page": null,
+  "data": {
+   "poId": "PO-00001",
+   "lines": [
+    {
+     "qty": 18,
+     "code": "chicken"
+    },
+    {
+     "qty": 2,
+     "code": "vegetable-oil"
+    }
+   ]
+  }
+ },
+ {
+  "seq": 4,
+  "type": "REQUEST",
+  "occurred_at": "2026-10-09T16:39:54.950Z",
+  "recorded_at": "2026-10-09T16:39:54.950Z",
+  "actor_id": "ec2a230c-2c95-43b1-b5d7-676b10fd3831",
+  "actor_name": "Bola",
+  "actor_role": "branch_manager",
+  "location_id": "tanke",
+  "source": "app",
+  "paper_page": null,
+  "data": {
+   "dest": "tanke",
+   "kind": "topup",
+   "lines": [
+    {
+     "qty": 5,
+     "code": "chicken"
+    }
+   ],
+   "reqId": "REQ-00001",
+   "branch": "tanke"
+  }
+ },
+ {
+  "seq": 5,
+  "type": "RELEASE",
+  "occurred_at": "2026-10-09T16:39:54.969Z",
+  "recorded_at": "2026-10-09T16:39:54.969Z",
+  "actor_id": "bd6406f0-5985-4a0e-9fc6-9bbcd6267784",
+  "actor_name": "Musa",
+  "actor_role": "storekeeper",
+  "location_id": "store",
+  "source": "app",
+  "paper_page": null,
+  "data": {
+   "dest": "tanke",
+   "lines": [
+    {
+     "qty": 5,
+     "code": "chicken"
+    }
+   ],
+   "movId": "MOV-00001",
+   "reqId": "REQ-00001",
+   "carrier": "Yusuf",
+   "carrierId": "9b30cb32-5789-4342-8e34-05e05f29a714"
+  }
+ },
+ {
+  "seq": 6,
+  "type": "REQUEST",
+  "occurred_at": "2026-10-09T16:39:54.984Z",
+  "recorded_at": "2026-10-09T16:39:54.984Z",
+  "actor_id": "ec2a230c-2c95-43b1-b5d7-676b10fd3831",
+  "actor_name": "Bola",
+  "actor_role": "branch_manager",
+  "location_id": "tanke",
+  "source": "app",
+  "paper_page": null,
+  "data": {
+   "dest": "tanke",
+   "kind": "planned",
+   "lines": [
+    {
+     "qty": 2,
+     "code": "eggs"
+    }
+   ],
+   "reqId": "REQ-00002",
+   "branch": "tanke"
+  }
+ },
+ {
+  "seq": 7,
+  "type": "RECEIPT",
+  "occurred_at": "2026-10-09T16:39:55.023Z",
+  "recorded_at": "2026-10-09T16:39:55.023Z",
+  "actor_id": "ec2a230c-2c95-43b1-b5d7-676b10fd3831",
+  "actor_name": "Bola",
+  "actor_role": "branch_manager",
+  "location_id": "tanke",
+  "source": "app",
+  "paper_page": null,
+  "data": {
+   "note": "one short",
+   "lines": [
+    {
+     "qty": 4,
+     "code": "chicken"
+    }
+   ],
+   "movId": "MOV-00001",
+   "photo": true,
+   "photoPath": "u/p.jpg"
+  }
+ },
+ {
+  "seq": 8,
+  "type": "REQUEST",
+  "occurred_at": "2026-10-09T16:39:55.025Z",
+  "recorded_at": "2026-10-09T16:39:55.025Z",
+  "actor_id": "b71cbab2-3f00-4339-86e0-90e19cef29ce",
+  "actor_name": "Aisha",
+  "actor_role": "cook",
+  "location_id": "kitchen",
+  "source": "app",
+  "paper_page": null,
+  "data": {
+   "dest": "kitchen",
+   "kind": "production",
+   "lines": [
+    {
+     "qty": 1,
+     "code": "garlic-powder"
+    }
+   ],
+   "reqId": "REQ-00003",
+   "branch": "kitchen"
+  }
+ },
+ {
+  "seq": 9,
+  "type": "RELEASE",
+  "occurred_at": "2026-10-09T16:39:55.027Z",
+  "recorded_at": "2026-10-09T16:39:55.027Z",
+  "actor_id": "bd6406f0-5985-4a0e-9fc6-9bbcd6267784",
+  "actor_name": "Musa",
+  "actor_role": "storekeeper",
+  "location_id": "store",
+  "source": "app",
+  "paper_page": null,
+  "data": {
+   "dest": "kitchen",
+   "lines": [
+    {
+     "qty": 1,
+     "code": "garlic-powder"
+    }
+   ],
+   "movId": "MOV-00003",
+   "reqId": "REQ-00003",
+   "receivedBy": "Aisha",
+   "receivedById": "b71cbab2-3f00-4339-86e0-90e19cef29ce"
+  }
+ },
+ {
+  "seq": 10,
+  "type": "YIELD",
+  "occurred_at": "2026-10-09T16:39:55.034Z",
+  "recorded_at": "2026-10-09T16:39:55.034Z",
+  "actor_id": "b71cbab2-3f00-4339-86e0-90e19cef29ce",
+  "actor_name": "Aisha",
+  "actor_role": "cook",
+  "location_id": "kitchen",
+  "source": "app",
+  "paper_page": null,
+  "data": {
+   "inputs": [
+    {
+     "qty": 1,
+     "code": "garlic-powder"
+    }
+   ],
+   "batchId": "B-00001",
+   "outputs": [
+    {
+     "qty": 3,
+     "code": "garlic-sauce"
+    }
+   ],
+   "issueIds": [
+    "MOV-00003"
+   ]
+  }
+ },
+ {
+  "seq": 11,
+  "type": "WASTE",
+  "occurred_at": "2026-10-09T14:39:55.042Z",
+  "recorded_at": "2026-10-09T16:39:55.042Z",
+  "actor_id": "bd6406f0-5985-4a0e-9fc6-9bbcd6267784",
+  "actor_name": "Musa",
+  "actor_role": "storekeeper",
+  "location_id": "store",
+  "source": "app",
+  "paper_page": null,
+  "data": {
+   "loc": "store",
+   "lines": [
+    {
+     "qty": 2,
+     "code": "tomatoes"
+    }
+   ],
+   "reason": "rotten",
+   "witness": "Aisha",
+   "photoPath": "p.jpg",
+   "witnessId": "b71cbab2-3f00-4339-86e0-90e19cef29ce"
+  }
+ },
+ {
+  "seq": 12,
+  "type": "KITCHEN_COUNT",
+  "occurred_at": "2026-10-09T16:39:55.047Z",
+  "recorded_at": "2026-10-09T16:39:55.047Z",
+  "actor_id": "7903ea00-6bb1-46f1-b3be-6385067d5e17",
+  "actor_name": "Kemi",
+  "actor_role": "kitchen_lead",
+  "location_id": "tanke",
+  "source": "app",
+  "paper_page": null,
+  "data": {
+   "loc": "tanke",
+   "lines": [
+    {
+     "qty": 3,
+     "code": "chicken"
+    }
+   ],
+   "businessDate": "2026-10-09"
+  }
+ },
+ {
+  "seq": 13,
+  "type": "COUNT",
+  "occurred_at": "2026-10-09T16:39:55.052Z",
+  "recorded_at": "2026-10-09T16:39:55.052Z",
+  "actor_id": "bd6406f0-5985-4a0e-9fc6-9bbcd6267784",
+  "actor_name": "Musa",
+  "actor_role": "storekeeper",
+  "location_id": "store",
+  "source": "app",
+  "paper_page": null,
+  "data": {
+   "loc": "store",
+   "lines": [
+    {
+     "qty": 13,
+     "code": "chicken"
+    }
+   ],
+   "partial": true,
+   "custodian": "Musa"
+  }
+ },
+ {
+  "seq": 14,
+  "type": "COUNT",
+  "occurred_at": "2026-10-09T16:39:55.055Z",
+  "recorded_at": "2026-10-09T16:39:55.055Z",
+  "actor_id": "7791160e-a2f2-417a-9558-f67522108acd",
+  "actor_name": "Ibrahim",
+  "actor_role": "owner",
+  "location_id": "store",
+  "source": "app",
+  "paper_page": null,
+  "data": {
+   "loc": "store",
+   "lines": [
+    {
+     "qty": 13,
+     "code": "chicken"
+    }
+   ],
+   "partial": true,
+   "custodian": "custodian of store"
+  }
+ },
+ {
+  "seq": 15,
+  "type": "CASH_EOD",
+  "occurred_at": "2026-10-09T16:39:55.063Z",
+  "recorded_at": "2026-10-09T16:39:55.063Z",
+  "actor_id": "a32211fe-609e-4ab0-bb39-d0f83cf1050d",
+  "actor_name": "Femi",
+  "actor_role": "cashier",
+  "location_id": "tanke",
+  "source": "app",
+  "paper_page": null,
+  "data": {
+   "app": 40550,
+   "card": 0,
+   "cash": 13500,
+   "note": null,
+   "branch": "tanke",
+   "photos": {
+    "app": "a.jpg",
+    "cash": "c.jpg",
+    "chowdeck": "d.jpg",
+    "transfer": "t.jpg"
+   },
+   "witness": "Bola",
+   "chowdeck": 4900,
+   "transfer": 243600,
+   "witnessId": "ec2a230c-2c95-43b1-b5d7-676b10fd3831",
+   "businessDate": "2026-10-09",
+   "deliveryFees": [
+    {
+     "ref": "A1",
+     "amount": 1500
+    },
+    {
+     "ref": "A2",
+     "amount": 1800
+    }
+   ],
+   "deliveryTotal": 3300,
+   "transferManual": true
+  }
+ },
+ {
+  "seq": 16,
+  "type": "ARONIUM_TOTAL",
+  "occurred_at": "2026-10-09T16:39:55.068Z",
+  "recorded_at": "2026-10-09T16:39:55.068Z",
+  "actor_id": "ec2a230c-2c95-43b1-b5d7-676b10fd3831",
+  "actor_name": "Bola",
+  "actor_role": "branch_manager",
+  "location_id": "tanke",
+  "source": "app",
+  "paper_page": null,
+  "data": {
+   "total": 298550,
+   "branch": "tanke",
+   "photoPath": "ar.jpg",
+   "businessDate": "2026-10-09"
+  }
+ },
+ {
+  "seq": 17,
+  "type": "CORRECTION",
+  "occurred_at": "2026-10-09T16:39:55.101Z",
+  "recorded_at": "2026-10-09T16:39:55.101Z",
+  "actor_id": "7791160e-a2f2-417a-9558-f67522108acd",
+  "actor_name": "Ibrahim",
+  "actor_role": "owner",
+  "location_id": "tanke",
+  "source": "app",
+  "paper_page": null,
+  "data": {
+   "loc": "tanke",
+   "lines": [
+    {
+     "qty": 1,
+     "code": "chicken"
+    }
+   ],
+   "refId": "6084c927-0c88-42c9-8716-a235a732ff55",
+   "reason": "Recount found the tray"
+  }
+ },
+ {
+  "seq": 18,
+  "type": "PURCHASE",
+  "occurred_at": "2026-10-08T16:39:55.106Z",
+  "recorded_at": "2026-10-09T16:39:55.106Z",
+  "actor_id": "0f7a81a0-84b5-4689-885c-6603f5654e8f",
+  "actor_name": "Tunde",
+  "actor_role": "buyer",
+  "location_id": "store",
+  "source": "paper",
+  "paper_page": "P-12",
+  "data": {
+   "poId": "PO-00002",
+   "lines": [
+    {
+     "qty": 5,
+     "code": "onions",
+     "unitPrice": null
+    }
+   ],
+   "supplier": "Mkt",
+   "invoicePhoto": null
+  }
+ },
+ {
+  "seq": 19,
+  "type": "STORE_CLOSE",
+  "occurred_at": "2026-10-09T16:39:55.108Z",
+  "recorded_at": "2026-10-09T16:39:55.108Z",
+  "actor_id": "bd6406f0-5985-4a0e-9fc6-9bbcd6267784",
+  "actor_name": "Musa",
+  "actor_role": "storekeeper",
+  "location_id": "store",
+  "source": "app",
+  "paper_page": null,
+  "data": {
+   "sessionId": "S-00001"
+  }
+ },
+ {
+  "seq": 20,
+  "type": "GRN",
+  "occurred_at": "2026-10-08T16:39:55.115Z",
+  "recorded_at": "2026-10-09T16:39:55.115Z",
+  "actor_id": "bd6406f0-5985-4a0e-9fc6-9bbcd6267784",
+  "actor_name": "Musa",
+  "actor_role": "storekeeper",
+  "location_id": "store",
+  "source": "paper",
+  "paper_page": "B-7",
+  "data": {
+   "poId": "PO-00002",
+   "lines": [
+    {
+     "qty": 5,
+     "code": "onions"
+    }
+   ]
+  }
+ }
+]

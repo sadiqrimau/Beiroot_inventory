@@ -1,0 +1,3 @@
+{ "name": "Beiroot stock", "short_name": "Beiroot", "start_url": "/", "display": "standalone",
+  "background_color": "#F6F7F4", "theme_color": "#1E5C46",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }] }

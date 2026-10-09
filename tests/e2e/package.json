@@ -1,0 +1,12 @@
+{
+  "name": "beiroot-e2e",
+  "private": true,
+  "type": "module",
+  "description": "End-to-end tests against an embedded Postgres running supabase/setup.sql. Not used by the live site.",
+  "scripts": {
+    "db": "node database.mjs",
+    "mock": "node mock-supabase.mjs",
+    "full-day": "node full-day.mjs"
+  },
+  "dependencies": { "@electric-sql/pglite": "0.2.17", "playwright-core": "1.47.2" }
+}
