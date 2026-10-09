@@ -3,3 +3,4 @@ dist
 .env
 .env.local
 .vercel
+tests/e2e/events.json
