@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1 (2026-10-09)
+
+- Branches named **Tanke branch** and **Adeta branch**. `setup.sql` now also fixes a database set up with the old "Branch 2" placeholder.
+- README: clearer Vercel environment-variable steps.
+
 ## 0.1.0 (2026-10-09): Phase 1
 
 - Database: `supabase/setup.sql` with locations, staff profiles, 63 seeded items, settings, an append-only ledger, row-level security, photo storage, and 27 secure functions for every staff action.

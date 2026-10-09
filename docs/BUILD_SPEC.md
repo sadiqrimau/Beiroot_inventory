@@ -35,7 +35,7 @@ Reference files in `reference/`:
 ## 1. The business
 
 - Fast food / quick service. Orders come in through walk-in, WhatsApp and phone, pickup and online ordering, **Chowdeck** (a third-party delivery platform), and the restaurant's **own custom ordering app** (built last year).
-- **One central kitchen + store** (same building) supplies **two branches**. One branch is **Tanke**; the second branch's name is OPEN.
+- **One central kitchen + store** (same building) supplies **two branches**. The branches are **Tanke branch** and **Adeta branch**.
 - The central kitchen produces **half-prepared components**. The branches finish and assemble the food.
 - Every order at a branch, from every channel, is entered by front desk staff into **Aronium** (desktop point-of-sale software). **Each branch has its own laptop running Aronium.**
 - Money comes in through five sources: **cash, transfer (Moniepoint), card (Moniepoint POS terminal), Chowdeck, own app.**
@@ -112,8 +112,8 @@ The owner asked whether roles can be combined to cut staff. Simulations were run
 
 - Central store
 - Central kitchen
-- Branch: Tanke
-- Branch 2 (name OPEN)
+- Tanke branch
+- Adeta branch
 
 The owner can add branches later. Every stock figure, count and report is per location.
 
@@ -595,7 +595,7 @@ Honest-operations noise (average of 5 honest fortnights): about 17 low and 4 hig
 | 3 | Units, bulk purchase units and prices once new suppliers are set | Naira values, conversions |
 | 4 | Which items are counted daily | Count schedule |
 | 5 | How the kitchen sheet's "slush", "bread", "fries mini/regular/large pack" map to stock items | Kitchen end-of-day |
-| 6 | Name of branch 2 | Setup |
+| 6 | ~~Name of branch 2~~: answered, **Adeta branch** | Setup |
 | 7 | Moniepoint: one terminal/account per branch? Do bank transfers arrive via webhook? Owner's account access | Automating transfer and card |
 | 8 | Who built the restaurant's own app; can it export or send orders? | App integration |
 | 9 | Delivery fee as an Aronium item, or keep subtracting per order? | Money end-of-day |

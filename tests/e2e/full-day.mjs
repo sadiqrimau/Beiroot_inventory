@@ -61,7 +61,7 @@ for (const [id, price, unit] of [['chicken', 4500, 'kg'], ['shawarma-bread', 300
   await row.locator('[data-f=cost_price]').fill(String(price)); await row.locator('[data-f=count_unit]').fill(unit);
   await row.locator('button', { hasText: 'Save' }).click(); await expectToast(owner, /Item saved/, 'price ' + id);
 }
-await btn(owner, 'Branches').click(); await owner.fill('#loc-branch2', 'Sango'); await owner.locator('button[data-id=branch2]').click(); await expectToast(owner, /Saved/, 'rename branch 2');
+await btn(owner, 'Branches').click(); await owner.fill('#loc-adeta', 'Adeta branch'); await owner.locator('button[data-id=adeta]').click(); await expectToast(owner, /Saved/, 'save Adeta branch name');
 
 // --- buyer logs purchase ---
 const buyer = await user('buyer'); await login(buyer, 'tunde', '222222');

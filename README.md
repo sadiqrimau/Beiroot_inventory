@@ -30,14 +30,16 @@ Do these in order. Everything works from a phone browser.
 
 1. Go to [vercel.com](https://vercel.com) and sign up **with your GitHub account**.
 2. **Add New** → **Project** → import **Beiroot_inventory**. Vercel detects Vite automatically; leave the build settings as they are.
-3. Before pressing Deploy, open **Environment Variables** and add four:
+3. Before pressing **Create Project** / **Deploy**, open **Environment Variables** on the same page. Add these four, one at a time: type the name in the **Key** box, paste the value in the **Value** box, then add the next one.
 
-   | Name | Value |
+   | Key (type exactly) | Value (where to find it) |
    | --- | --- |
-   | `VITE_SUPABASE_URL` | the Project URL |
-   | `VITE_SUPABASE_ANON_KEY` | the anon / publishable key |
-   | `SUPABASE_SERVICE_ROLE_KEY` | the service_role / secret key |
-   | `BOOTSTRAP_CODE` | any long secret phrase you choose, used once to create the owner |
+   | `VITE_SUPABASE_URL` | Supabase → Project Settings → API (or Data API) → **Project URL** |
+   | `VITE_SUPABASE_ANON_KEY` | Supabase → Project Settings → API Keys → **anon public** key (under "Legacy API keys" if there are two tabs) |
+   | `SUPABASE_SERVICE_ROLE_KEY` | Same page → **service_role** key (press Reveal). Keep it secret. |
+   | `BOOTSTRAP_CODE` | A secret phrase you make up, e.g. `beiroot-start-2026`. You type it once when creating the owner account. |
+
+   Leave Root Directory as `./` and Application Preset as **Vite**. Don't use the "Add Supabase" integration button; the four keys above are all the site needs.
 
 4. Press **Deploy**. You get a live link like `beiroot-inventory.vercel.app`. Every time new code is saved to GitHub, Vercel republishes it automatically.
 
@@ -48,7 +50,7 @@ If you add or change an environment variable later, go to **Deployments** → **
 1. Open the live link → **First-time setup**.
 2. Enter the `BOOTSTRAP_CODE`, and the owner's full name, username and a 6-digit PIN. This works only once.
 3. Signed in as the owner, go to **Settings → Staff** and create everyone else. Each person gets a username and 6-digit PIN. Give branch roles (branch manager, kitchen lead, cashier) their branch.
-4. **Settings → Branches**: rename "Branch 2" to the real name.
+4. **Settings → Branches**: the two branches are already set up as **Tanke branch** and **Adeta branch**. Add more here if the restaurant opens another.
 5. **Settings → Items**: set units, bulk units and prices when the new suppliers are agreed. Until then, alerts work on quantities.
 
 Staff can add the site to their phone's home screen (browser menu → *Add to Home screen*).

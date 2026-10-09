@@ -748,8 +748,8 @@ end $$;
 insert into public.locations (id, name, kind) values
   ('store', 'Central store', 'store'),
   ('kitchen', 'Central kitchen', 'kitchen'),
-  ('tanke', 'Tanke', 'branch'),
-  ('branch2', 'Branch 2', 'branch')
+  ('tanke', 'Tanke branch', 'branch'),
+  ('adeta', 'Adeta branch', 'branch')
 on conflict (id) do nothing;
 
 insert into public.settings (key, value) values
@@ -824,3 +824,13 @@ insert into public.items (id, name, category, kind, count_frequency, tracks_expi
   ('mosquito-spray','Mosquito spray','Maintenance','raw','weekly',false,null),
   ('garlic-sauce','Garlic sauce','Kitchen-made','prepared','daily',true,'Made in the central kitchen. Recipe and batch yield to confirm')
 on conflict (id) do nothing;
+
+-- ---------- Branch names (safe to re-run) ----------------------------------
+-- The two branches are Tanke branch and Adeta branch. This also fixes a database
+-- that was set up with the earlier placeholder "Branch 2".
+update public.locations set name = 'Tanke branch' where id = 'tanke';
+insert into public.locations (id, name, kind) values ('adeta', 'Adeta branch', 'branch')
+  on conflict (id) do update set name = excluded.name, kind = 'branch', active = true;
+update public.profiles set branch_id = 'adeta' where branch_id = 'branch2';
+delete from public.locations l where l.id = 'branch2'
+  and not exists (select 1 from public.events e where e.location_id = 'branch2' or e.data->>'dest' = 'branch2' or e.data->>'branch' = 'branch2');

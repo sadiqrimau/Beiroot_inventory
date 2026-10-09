@@ -2,6 +2,10 @@
 
 The design decisions come from [`docs/BUILD_SPEC.md`](docs/BUILD_SPEC.md). This file records choices made while building, and anything that differs from the spec. Newest first.
 
+## 2026-10-09: Branch names
+
+The branches are **Tanke branch** (id `tanke`) and **Adeta branch** (id `adeta`). The placeholder "Branch 2" is gone. Names carry the word "branch" and differ from the first letter on, so they can't be confused on screen. Ids never change, so renaming a branch later never breaks past records.
+
 ## 2026-10-09: Phase 1 build
 
 | Decision | Why |

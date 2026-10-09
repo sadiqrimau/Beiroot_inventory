@@ -18,7 +18,7 @@ const U = {};
 const people = [
   ['owner','Ibrahim',['owner'],null],['store','Musa',['storekeeper'],null],['buyer','Tunde',['buyer'],null],
   ['driver','Yusuf',['driver'],null],['cook','Aisha',['cook'],null],['bm','Bola',['branch_manager'],'tanke'],
-  ['kl','Kemi',['kitchen_lead'],'tanke'],['cash','Femi',['cashier'],'tanke'],['bm2','Sola',['branch_manager'],'branch2'],
+  ['kl','Kemi',['kitchen_lead'],'tanke'],['cash','Femi',['cashier'],'tanke'],['bm2','Sola',['branch_manager'],'adeta'],
 ];
 for (const [k, n, roles, br] of people) {
   const id = crypto.randomUUID(); U[k] = id;
@@ -81,7 +81,7 @@ if (iss2.length !== 0) { fail++; console.log('FAIL yield did not close issue'); 
 await as('store', `select record_write_off('store', now() - interval '2 hours', '[{"code":"tomatoes","qty":2}]'::jsonb, 'rotten', $1, 'p.jpg')`, [U.store], 'different person');
 await as('store', `select record_write_off('store', now() - interval '2 hours', '[{"code":"tomatoes","qty":2}]'::jsonb, 'rotten', $1, null)`, [U.cook], 'photo');
 await as('store', `select record_write_off('store', now() - interval '2 hours', '[{"code":"tomatoes","qty":2}]'::jsonb, 'rotten', $1, 'p.jpg')`, [U.cook]);
-await as('bm', `select record_write_off('branch2', now(), '[{"code":"tomatoes","qty":1}]'::jsonb, 'x', $1, 'p.jpg')`, [U.cook], 'your branch');
+await as('bm', `select record_write_off('adeta', now(), '[{"code":"tomatoes","qty":1}]'::jsonb, 'x', $1, 'p.jpg')`, [U.cook], 'your branch');
 // Counts
 const c1 = await one('kl', `select submit_count('tanke', '[{"code":"chicken","qty":3}]'::jsonb)`);
 await as('kl', `select submit_count('tanke', '[{"code":"chicken","qty":3}]'::jsonb)`, [], 'already submitted');
