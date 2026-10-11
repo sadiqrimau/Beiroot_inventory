@@ -108,9 +108,6 @@ await fillLines(bm, rcBox, [{ qty: 7 }, { qty: 40 }]);
 await btn(bm, 'Confirm received').click(); await expectToast(bm, /Take a photo/, 'receipt needs photo');
 await bm.setInputFiles(`#rc-photo-${rcBox.slice(3)}`, 'photo.jpg');
 await btn(bm, 'Confirm received').click(); await expectToast(bm, /Delivery confirmed/, 'receipt confirmed (1 short)');
-// aronium total
-await bm.fill('#ar-total', '298550'); await bm.setInputFiles('#ar-photo', 'photo.jpg');
-await btn(bm, 'Submit Aronium total').click(); await expectToast(bm, /Aronium total submitted/, 'aronium total');
 
 // --- kitchen: cook requests, store releases, cook reports yield ---
 const cook = await user('cook'); await login(cook, 'aisha', '222222');
@@ -144,9 +141,16 @@ await cash.selectOption('#ce-witness', { label: 'Bola Manager' });
 await btn(cash, 'Add delivery').click(); await btn(cash, 'Add delivery').click();
 await cash.locator('.fee-ref').nth(0).fill('A101'); await cash.locator('.fee-amt').nth(0).fill('1500');
 await cash.locator('.fee-ref').nth(1).fill('A102'); await cash.locator('.fee-amt').nth(1).fill('1800');
-await btn(cash, 'Submit end of day').click(); await expectToast(cash, /photo of the counted cash/, 'cash needs photo');
+await btn(cash, 'Add refund').click();
+await cash.locator('.rf-ref').nth(0).fill('A099'); await cash.locator('.rf-amt').nth(0).fill('2500'); await cash.locator('.rf-why').nth(0).fill('Wrong order sent');
+await cash.fill('#ce-note', 'POS network was down for an hour');
+await btn(cash, 'Submit money received').click(); await expectToast(cash, /photo of the counted cash/, 'cash needs photo');
 for (const k of ['cash', 'transfer', 'chowdeck', 'app']) await cash.setInputFiles('#ce-ph-' + k, 'photo.jpg');
-await btn(cash, 'Submit end of day').click(); await expectToast(cash, /End of day submitted/, 'cash EOD');
+await btn(cash, 'Submit money received').click(); await expectToast(cash, /Money received saved/, 'cash EOD step 1');
+const step2 = await cash.textContent('main');
+if (/298,550|\+₦700|Difference/.test(step2)) errors.push('cashier sees result after step 1'); else console.log('ok   step 2 shows no result');
+await cash.fill('#ar-total', '298550'); await cash.setInputFiles('#ar-photo', 'photo.jpg');
+await btn(cash, 'Submit Aronium total').click(); await expectToast(cash, /End of day complete/, 'cash EOD step 2 (Aronium)');
 const cashTxt = await cash.textContent('main');
 if (/298,550|700/.test(cashTxt)) errors.push('cashier can see Aronium total or difference'); else console.log('ok   cashier sees no totals');
 

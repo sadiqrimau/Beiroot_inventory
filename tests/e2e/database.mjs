@@ -93,10 +93,11 @@ await as('kl', `select submit_count('store', '[{"code":"chicken","qty":3}]'::jso
 // Money EOD
 await as('cash', `select submit_cash_eod(lagos_today(), 13500, 243600, 0, 4900, 40550, '[{"ref":"A1","amount":1500},{"ref":"A2","amount":1800}]'::jsonb, $1, '{"cash":"c.jpg","transfer":"t.jpg","chowdeck":"d.jpg","app":"a.jpg"}'::jsonb)`, [U.cash], 'different person');
 await as('cash', `select submit_cash_eod(lagos_today(), 13500, 243600, 0, 4900, 40550, '[]'::jsonb, $1, '{"cash":"c.jpg"}'::jsonb)`, [U.bm], 'Chowdeck screenshot');
-await as('cash', `select submit_cash_eod(lagos_today(), 13500, 243600, 0, 4900, 40550, '[{"ref":"A1","amount":1500},{"ref":"A2","amount":1800}]'::jsonb, $1, '{"cash":"c.jpg","transfer":"t.jpg","chowdeck":"d.jpg","app":"a.jpg"}'::jsonb)`, [U.bm]);
+await as('cash', `select submit_aronium_total(lagos_today(), 298550, 'ar.jpg')`, [], 'money received for this date first');
+await as('cash', `select submit_cash_eod(lagos_today(), 13500, 243600, 0, 4900, 40550, '[{"ref":"A1","amount":1500},{"ref":"A2","amount":1800}]'::jsonb, $1, '{"cash":"c.jpg","transfer":"t.jpg","chowdeck":"d.jpg","app":"a.jpg"}'::jsonb, null, '[{"ref":"A9","amount":2500,"reason":"wrong order"}]'::jsonb)`, [U.bm]);
 await as('cash', `select submit_cash_eod(lagos_today(), 1, 0, 0, 0, 0, '[]'::jsonb, $1, '{"cash":"c.jpg"}'::jsonb)`, [U.bm], 'already submitted');
-await as('bm', `select submit_aronium_total(lagos_today(), 298550, 'ar.jpg')`);
-await as('cash', `select submit_aronium_total(lagos_today(), 298550, 'ar.jpg')`, [], 'role cannot');
+await as('cash', `select submit_aronium_total(lagos_today(), 298550, 'ar.jpg')`);
+await as('kl', `select submit_aronium_total(lagos_today(), 298550, 'ar.jpg')`, [], 'role cannot');
 // Blind reads: staff cannot read events or other profiles
 const ev = await as('cash', 'select count(*)::int as c from events');
 if (ev[0].c !== 0) { fail++; console.log('FAIL cashier can read events'); } else n++;

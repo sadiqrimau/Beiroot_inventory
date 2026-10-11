@@ -38,7 +38,10 @@ export function money(ctx, branch, date) {
   const diff = (c && a) ? r2(net - aronium) : null;
   const tol = Number(ctx.rules.moneyTolerance ?? 500);
   const status = diff === null ? 'incomplete' : diff === 0 ? 'balanced' : diff > 0 ? 'positive' : 'negative';
-  return { branch, date, cash: c, aron: a, sources, received, delivery, net, aronium, diff, status, beyond: diff !== null && Math.abs(diff) > tol };
+  const refunds = c ? (c.refunds || []) : [], refundTotal = c ? Number(c.refundTotal || 0) : 0;
+  const diffAfterRefunds = diff === null || !refundTotal ? null : r2(diff + refundTotal);
+  return { branch, date, cash: c, aron: a, sources, received, delivery, net, aronium, diff, status, refunds, refundTotal, diffAfterRefunds,
+    note: c ? c.note : null, beyond: diff !== null && Math.abs(diff) > tol };
 }
 
 export function moneyHistory(ctx, branch, endDate, days = 14) {
@@ -154,6 +157,12 @@ export function extraAlerts(ctx, now = Date.now()) {
         title: `Money ${m.diff < 0 ? 'short' : 'over'} at ${br.name}`, detail: `${d}: received ₦${Math.round(m.net).toLocaleString()} after delivery, Aronium ₦${Math.round(m.aronium).toLocaleString()}`,
         accountable: m.cash.by.name, value: Math.abs(m.diff), refs: { loc: br.id } });
     }
+    // Every refund or note from the cashier reaches the owner.
+    ctx.events.filter(e => e.type === 'CASH_EOD' && e.locationId === br.id && e.ts > now - 30 * DAY && ((e.refunds || []).length || e.note))
+      .forEach(e => out.push({ code: 'CASHIER_NOTE', sev: 'med', ts: e.recordedTs || e.ts,
+        title: (e.refunds || []).length ? `Refund${e.refunds.length > 1 ? 's' : ''} at ${br.name}: ₦${Math.round(e.refundTotal || 0).toLocaleString()}` : `Cashier note at ${br.name}`,
+        detail: [e.businessDate, ...(e.refunds || []).map(r => `${r.ref ? r.ref + ': ' : ''}₦${Math.round(r.amount).toLocaleString()} (${r.reason})`), e.note ? 'Note: ' + e.note : ''].filter(Boolean).join(' · '),
+        accountable: e.by.name, value: Number(e.refundTotal || 0), refs: { loc: br.id } }));
     const last7 = moneyHistory(ctx, br.id, today, 7).filter(m => m.diff !== null && m.diff !== undefined);
     const neg = last7.filter(m => m.diff < 0);
     if (neg.length >= 4) out.push({ code: 'MONEY_VARIANCE_PATTERN', sev: 'high', ts: now, title: `Money short again and again at ${br.name}`,
@@ -166,5 +175,6 @@ export function extraAlerts(ctx, now = Date.now()) {
 }
 
 export const ALERT_LABEL = {
+  CASHIER_NOTE: 'Cashier note',
   MONEY_VARIANCE: 'Money', MONEY_VARIANCE_PATTERN: 'Money pattern', MISSING_SUBMISSION: 'Missing',
 };

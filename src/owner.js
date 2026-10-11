@@ -54,6 +54,8 @@ const today = {
         <tbody>${d.ctx.branches.map(br => `<tr><td>${esc(br.name)}</td>${moneyRow(br)}</tr>`).join('')}</tbody></table></div>
       <h2>Still to come in today</h2>
       ${miss.length ? `<ul class="plain">${miss.map(m => `<li>${esc(d.ctx.locs[m.loc] || m.loc)}: ${esc(m.what)}</li>`).join('')}</ul>` : '<p class="done">Everything for today is in.</p>'}
+      ${(() => { const notes = d.alerts.filter(a => a.code === 'CASHIER_NOTE' && a.ts > Date.now() - 2 * 864e5);
+        return notes.length ? `<h2>Refunds and notes from cashiers</h2>${alertList(notes)}` : ''; })()}
       <h2>Act on these</h2>${alertList(hi.slice(0, 12))}
       ${hi.length > 12 ? `<p><button class="ghost" data-tab="alerts">See all ${hi.length}</button></p>` : ''}
     </section>`;
@@ -90,9 +92,12 @@ function moneyBlock(ctx, m, br) {
           : `<tr><th>Cashier</th><td class="n">Not submitted</td></tr>`}
       ${line('Aronium (desktop EOD)', m.aronium)}
       <tr class="result ${m.status}"><th>Difference</th><td class="n">${m.diff === null ? 'Waiting' : (m.diff > 0 ? '+' : '') + naira(m.diff)}</td></tr>
+      ${m.refundTotal ? `<tr><th>Refunds given</th><td class="n">${naira(m.refundTotal)}</td></tr>` + (m.diffAfterRefunds !== null ? `<tr class="sum"><th>Difference if the refunds explain it</th><td class="n">${m.diffAfterRefunds > 0 ? '+' : ''}${naira(m.diffAfterRefunds)}</td></tr>` : '') : ''}
     </tbody></table>
     ${m.diff !== null ? `<p class="verdict ${m.status}">${m.status === 'balanced' ? 'BALANCED' : m.status === 'positive' ? 'POSITIVE' : 'NEGATIVE'}</p>` : ''}
-    ${c ? `<p class="lede">Cashier ${esc(c.by.name)}, cash watched by ${esc(c.witness)}, submitted ${fmtT(c.recordedTs)}.${c.note ? ' Note: ' + esc(c.note) : ''}</p>
+    ${m.refunds.length ? `<div class="note"><b>Refunds</b><ul class="plain">${m.refunds.map(r => `<li>${esc(r.ref || '—')}: ${naira(r.amount)} · ${esc(r.reason)}</li>`).join('')}</ul></div>` : ''}
+    ${m.note ? `<p class="note"><b>Cashier's note:</b> ${esc(m.note)}</p>` : ''}
+    ${c ? `<p class="lede">Cashier ${esc(c.by.name)}, cash watched by ${esc(c.witness)}, submitted ${fmtT(c.recordedTs)}.${m.aron ? ` Aronium total entered by ${esc(m.aron.by.name)} at ${fmtT(m.aron.recordedTs)}: check it against the photo.` : ''}</p>
       ${(c.deliveryFees || []).length ? `<details><summary>${c.deliveryFees.length} deliveries</summary><ul class="plain">${c.deliveryFees.map(f => `<li>${esc(f.ref || '—')}: ${naira(f.amount)}</li>`).join('')}</ul></details>` : ''}
       <div class="actions">${Object.entries(c.photos || {}).map(([k, p]) => photoBtn(p, k[0].toUpperCase() + k.slice(1))).join('')}${m.aron ? photoBtn(m.aron.photoPath, 'Aronium report') : ''}</div>` : ''}
   </div>`;
@@ -155,8 +160,8 @@ const reports = {
     async csv(S) {
       const d = await ownerData(); const ctx = d.ctx, day = S.repDay;
       if (S.repKind === 'money') {
-        const rows = [['Date', 'Branch', 'Cash', 'Transfer', 'Card', 'Chowdeck', 'App', 'Total received', 'Delivery fees', 'After delivery', 'Aronium', 'Difference', 'Status']];
-        ctx.branches.forEach(br => { const m = Rep.money(ctx, br.id, day); if (m) rows.push([day, br.name, m.sources?.cash, m.sources?.transfer, m.sources?.card, m.sources?.chowdeck, m.sources?.app, m.received, m.delivery, m.net, m.aronium, m.diff, m.status]); });
+        const rows = [['Date', 'Branch', 'Cash', 'Transfer', 'Card', 'Chowdeck', 'App', 'Total received', 'Delivery fees', 'After delivery', 'Aronium', 'Difference', 'Status', 'Refunds', 'Cashier note']];
+        ctx.branches.forEach(br => { const m = Rep.money(ctx, br.id, day); if (m) rows.push([day, br.name, m.sources?.cash, m.sources?.transfer, m.sources?.card, m.sources?.chowdeck, m.sources?.app, m.received, m.delivery, m.net, m.aronium, m.diff, m.status, m.refundTotal, m.note || '']); });
         downloadCsv(`money-eod-${day}.csv`, rows);
       } else if (S.repKind === 'kitchen') {
         const rows = [['Date', 'Branch', 'Item', 'Unit', 'Opening', 'Received', 'Counted', 'Used']];

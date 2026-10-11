@@ -169,7 +169,7 @@ const kitchen = {
 // ---------------- Branch manager ----------------
 const branch = {
   id: 'branch', label: 'Branch', roles: ['branch_manager'],
-  async load() { const [incoming, subs] = await Promise.all([rpc('incoming_deliveries'), rpc('my_submissions')]); return { incoming, subs }; },
+  async load() { return { incoming: await rpc('incoming_deliveries') }; },
   view(S, d) {
     const inc = d.incoming.length ? d.incoming.map(t => `<div class="card open"><h3>Delivery ${esc(t.movId)} <small>with ${esc(t.carrier)}${t.emergency ? ' · emergency' : ''}</small></h3>
         <p class="lede">Count it at the door with the driver present. The quantities sent are hidden on purpose. Both of you sign the delivery book.</p>
@@ -184,13 +184,6 @@ const branch = {
       <div class="card"><h3>Request stock</h3>
         <label>Type<select id="br-kind"><option value="planned">Planned delivery</option><option value="topup">Top-up (urgent)</option></select></label>
         ${lineEditor('br-lines', S.items)}<button class="primary" data-act="breq">Send request</button></div>
-      <div class="card"><h3>Aronium end of day</h3>
-        ${d.subs.aroniumTotal ? '<p class="done">Today\'s Aronium total is submitted.</p>' : ''}
-        <p class="lede">Enter the total sales from the Aronium end-of-day report and take a photo of it.</p>
-        <label>Date<select id="ar-date"><option value="${lagosDate()}">Today, ${fmtD(lagosDate())}</option><option value="${yesterday()}">Yesterday, ${fmtD(yesterday())}</option></select></label>
-        <label>Aronium total sales (₦)<input type="number" inputmode="decimal" min="0" id="ar-total"></label>
-        ${photoField('ar-photo', 'Photo of the Aronium report', true)}
-        <button class="primary" data-act="aronium">Submit Aronium total</button></div>
       ${writeOffCard(S, S.me.branch_id, 'Write off spoiled stock at the branch')}</section>`;
   },
   act: {
@@ -201,9 +194,6 @@ const branch = {
       toast('Delivery confirmed.'); },
     async breq() { const lines = readLines('br-lines'); need(lines.length, 'Add the items.');
       const rq = await rpc('raise_request', { p_kind: val('br-kind'), p_lines: lines }); toast(`Request ${rq} sent to the store.`); },
-    async aronium(S) { need(val('ar-total') !== '', 'Enter the total.'); need(file('ar-photo'), 'Add a photo of the report.');
-      const photo = await uploadPhoto(file('ar-photo'), S.me.id);
-      await rpc('submit_aronium_total', { p_date: val('ar-date'), p_total: Number(val('ar-total')), p_photo: photo }); toast('Aronium total submitted.'); },
     writeoff: doWriteOff,
   },
 };
@@ -228,26 +218,47 @@ const kcount = {
 };
 
 // ---------------- Cashier ----------------
-const MONEY = [['cash', 'Cash (counted)'], ['transfer', 'Transfer (Moniepoint)'], ['card', 'Card / POS (Moniepoint)'], ['chowdeck', 'Chowdeck'], ['app', 'App']];
+const MONEY = [['cash', 'Cash (counted)', ''], ['transfer', 'Transfer (Moniepoint)', ''], ['card', 'Card / POS (Moniepoint)', ''],
+  ['chowdeck', 'Chowdeck', 'full order value'], ['app', 'App', 'full order value']];
+const rowHtml = (cls, fields) => `<div class="fee ${cls}">${fields}<button type="button" class="x" data-act="rmrow" aria-label="Remove">×</button></div>`;
 const cash = {
   id: 'cash', label: 'End of day', roles: ['cashier'],
-  async load() { const [t, y] = await Promise.all([rpc('my_submissions', { p_date: lagosDate() }), rpc('my_submissions', { p_date: yesterday() })]); return { t, y }; },
+  async load() {
+    const [t, y] = await Promise.all([rpc('my_submissions', { p_date: lagosDate() }), rpc('my_submissions', { p_date: yesterday() })]);
+    return { t, y };
+  },
   view(S, d) {
-    const opt = (v, l, done) => `<option value="${v}" ${done ? 'disabled' : ''}>${l}${done ? ' (submitted)' : ''}</option>`;
-    if (d.t.cashEod && d.y.cashEod) return `<section><h2>Money end of day</h2><p class="done">Today's end of day is submitted. Thank you.</p></section>`;
-    return `<section><h2>Money end of day · ${esc(S.me.branch_name || '')}</h2>
-      <p class="lede">Count the cash with the branch manager watching. Enter each amount and add its photo or screenshot. You can't change it after submitting.</p>
-      <label>Date<select id="ce-date">${opt(lagosDate(), 'Today, ' + fmtD(lagosDate()), d.t.cashEod)}${opt(yesterday(), 'Yesterday, ' + fmtD(yesterday()), d.y.cashEod)}</select></label>
-      ${MONEY.map(([k, l]) => `<div class="card money"><label>${esc(l)} (₦)<input type="number" inputmode="decimal" min="0" id="ce-${k}" placeholder="0"></label>
+    const days = [[lagosDate(), 'Today, ' + fmtD(lagosDate()), d.t], [yesterday(), 'Yesterday, ' + fmtD(yesterday()), d.y]];
+    const needMoney = days.filter(([, , x]) => !x.cashEod);
+    const needAron = days.filter(([, , x]) => x.cashEod && !x.aroniumTotal);
+    if (!needAron.length && d.t.cashEod) return `<section><h2>End of day · ${esc(S.me.branch_name || '')}</h2><p class="done">Today's end of day is complete. Thank you.</p></section>`;
+    // Step 2 comes first on screen when step 1 is done for a day.
+    if (needAron.length) return `<section><h2>End of day · ${esc(S.me.branch_name || '')}</h2>
+      <p class="done">Step 1 done: the money received is saved.</p>
+      <div class="card"><h3>Step 2 of 2: Aronium total</h3>
+        <p class="lede">Now print or open the Aronium end-of-day report. Enter its total sales and take a photo of it.</p>
+        <label>Date<select id="ar-date">${needAron.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>
+        <label>Aronium total sales (₦)<input type="number" inputmode="decimal" min="0" id="ar-total"></label>
+        ${photoField('ar-photo', 'Photo of the Aronium report', true)}
+        <button class="primary" data-act="aronium">Submit Aronium total</button></div></section>`;
+    return `<section><h2>End of day · ${esc(S.me.branch_name || '')}</h2>
+      <div class="card"><h3>Step 1 of 2: money received</h3>
+      <p class="lede">Count the cash with the branch manager watching. Enter each amount and add its photo or screenshot. You can't change it after submitting. You enter the Aronium total after this.</p>
+      <label>Date<select id="ce-date">${needMoney.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label></div>
+      ${MONEY.map(([k, l, hint]) => `<div class="card money"><label>${esc(l)} (₦)${hint ? ` <small>${esc(hint)}</small>` : ''}<input type="number" inputmode="decimal" min="0" id="ce-${k}" placeholder="0"></label>
         ${photoField('ce-ph-' + k, k === 'cash' ? 'Photo of the counted cash' : 'Screenshot (needed if the amount is more than 0)', true)}</div>`).join('')}
       ${staffSelect('ce-witness', S.staff, { exclude: S.me.id, roles: ['branch_manager', 'owner', 'admin'], label: 'Who watched the cash count', branch: S.me.branch_id })}
       <div class="card"><h3>Delivery fees</h3><p class="lede">One line per delivery order: the order number and the fee the customer paid.</p>
         <div id="ce-fees"></div><button type="button" class="ghost" data-act="addfee">Add delivery</button></div>
-      <label>Note<input id="ce-note" placeholder="Anything the owner should know"></label>
-      <button class="primary" data-act="cashEod">Submit end of day</button></section>`;
+      <div class="card"><h3>Refunds</h3><p class="lede">Money given back to a customer today: the order number, the amount and why. The owner is alerted for every refund.</p>
+        <div id="ce-refunds"></div><button type="button" class="ghost" data-act="addrefund">Add refund</button></div>
+      <label>Note for the owner <small>anything unusual today</small><textarea id="ce-note" rows="3" placeholder="e.g. POS was down for an hour, a customer paid the next day…"></textarea></label>
+      <button class="primary" data-act="cashEod">Submit money received</button></section>`;
   },
   act: {
-    addfee() { $('#ce-fees').insertAdjacentHTML('beforeend', `<div class="fee"><input placeholder="Order no." class="fee-ref"><input type="number" inputmode="decimal" min="0" placeholder="₦" class="fee-amt"><button type="button" class="x" data-act="rmfee" aria-label="Remove">×</button></div>`); return 'stay'; },
+    addfee() { $('#ce-fees').insertAdjacentHTML('beforeend', rowHtml('', `<input placeholder="Order no." class="fee-ref"><input type="number" inputmode="decimal" min="0" placeholder="₦" class="fee-amt">`)); return 'stay'; },
+    addrefund() { $('#ce-refunds').insertAdjacentHTML('beforeend', rowHtml('refund', `<input placeholder="Order no." class="rf-ref"><input type="number" inputmode="decimal" min="0" placeholder="₦" class="rf-amt"><input placeholder="Reason" class="rf-why">`)); return 'stay'; },
+    rmrow(S, b) { b.closest('.fee').remove(); return 'stay'; },
     rmfee(S, b) { b.closest('.fee').remove(); return 'stay'; },
     async cashEod(S) {
       const amt = {}; MONEY.forEach(([k]) => { amt[k] = Number(val('ce-' + k) || 0); need(amt[k] >= 0, 'Amounts cannot be negative.'); });
@@ -255,6 +266,8 @@ const cash = {
       need(val('ce-witness'), 'Choose who watched the cash count.');
       const fees = [...document.querySelectorAll('#ce-fees .fee')].map(f => ({ ref: f.querySelector('.fee-ref').value.trim(), amount: Number(f.querySelector('.fee-amt').value || 0) })).filter(f => f.ref || f.amount);
       fees.forEach(f => need(f.amount > 0, 'Each delivery needs its fee.'));
+      const refunds = [...document.querySelectorAll('#ce-refunds .fee')].map(f => ({ ref: f.querySelector('.rf-ref').value.trim(), amount: Number(f.querySelector('.rf-amt').value || 0), reason: f.querySelector('.rf-why').value.trim() })).filter(f => f.ref || f.amount || f.reason);
+      refunds.forEach(f => { need(f.amount > 0, 'Each refund needs its amount.'); need(f.reason, 'Each refund needs a reason.'); });
       const photos = {};
       for (const [k] of MONEY) {
         const f = file('ce-ph-' + k);
@@ -263,8 +276,15 @@ const cash = {
         if (f) photos[k] = await uploadPhoto(f, S.me.id);
       }
       await rpc('submit_cash_eod', { p_date: val('ce-date'), p_cash: amt.cash, p_transfer: amt.transfer, p_card: amt.card,
-        p_chowdeck: amt.chowdeck, p_app: amt.app, p_delivery_fees: fees, p_witness: val('ce-witness'), p_photos: photos, p_note: val('ce-note') || null });
-      toast('End of day submitted.');
+        p_chowdeck: amt.chowdeck, p_app: amt.app, p_delivery_fees: fees, p_witness: val('ce-witness'), p_photos: photos,
+        p_note: val('ce-note') || null, p_refunds: refunds });
+      toast('Money received saved. Now enter the Aronium total.');
+    },
+    async aronium(S) {
+      need(val('ar-total') !== '', 'Enter the Aronium total.'); need(file('ar-photo'), 'Add a photo of the Aronium report.');
+      const photo = await uploadPhoto(file('ar-photo'), S.me.id);
+      await rpc('submit_aronium_total', { p_date: val('ar-date'), p_total: Number(val('ar-total')), p_photo: photo });
+      toast('Aronium total submitted. End of day complete.');
     },
   },
 };

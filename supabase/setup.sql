@@ -581,12 +581,18 @@ begin
   return json_build_object('ok', true, 'held', custodian = p.full_name);
 end $$;
 
--- ---------- Money end of day (cashier) and Aronium total (branch manager) ---
+-- ---------- Money end of day and Aronium total (both by the cashier) ----------
+-- Step 1: the cashier submits the five money sources, delivery fees, refunds and notes.
+-- Step 2: only after step 1 is locked can the Aronium total for that day be entered.
+
+drop function if exists public.submit_cash_eod(date, numeric, numeric, numeric, numeric, numeric, jsonb, uuid, jsonb, text);
 
 create or replace function public.submit_cash_eod(p_date date, p_cash numeric, p_transfer numeric, p_card numeric,
-  p_chowdeck numeric, p_app numeric, p_delivery_fees jsonb, p_witness uuid, p_photos jsonb, p_note text default null)
+  p_chowdeck numeric, p_app numeric, p_delivery_fees jsonb, p_witness uuid, p_photos jsonb, p_note text default null,
+  p_refunds jsonb default '[]'::jsonb)
 returns void language plpgsql security definer set search_path = public, pg_temp as $$
-declare p profiles := _me(); w profiles; fees jsonb := '[]'; f jsonb; total_fees numeric := 0;
+declare p profiles := _me(); w profiles; fees jsonb := '[]'; refunds jsonb := '[]'; f jsonb;
+  total_fees numeric := 0; total_refunds numeric := 0;
 begin
   perform _need(p, 'cashier');
   if p.branch_id is null then raise exception 'Your account has no branch. Ask the owner.'; end if;
@@ -605,6 +611,14 @@ begin
       total_fees := total_fees + (f->>'amount')::numeric;
     end loop;
   end if;
+  if coalesce(jsonb_typeof(p_refunds), 'null') = 'array' then
+    for f in select * from jsonb_array_elements(p_refunds) loop
+      if coalesce((f->>'amount')::numeric, 0) <= 0 then raise exception 'Each refund needs an amount.'; end if;
+      if coalesce(trim(f->>'reason'), '') = '' then raise exception 'Each refund needs a reason.'; end if;
+      refunds := refunds || jsonb_build_object('ref', coalesce(f->>'ref', ''), 'amount', round((f->>'amount')::numeric, 2), 'reason', trim(f->>'reason'));
+      total_refunds := total_refunds + (f->>'amount')::numeric;
+    end loop;
+  end if;
   if (p_photos->>'cash') is null then raise exception 'Add a photo of the counted cash.'; end if;
   if coalesce(p_chowdeck, 0) > 0 and (p_photos->>'chowdeck') is null then raise exception 'Add the Chowdeck screenshot.'; end if;
   if coalesce(p_app, 0) > 0 and (p_photos->>'app') is null then raise exception 'Add the app screenshot.'; end if;
@@ -613,24 +627,29 @@ begin
   perform _emit(p, 'CASH_EOD', p.branch_id, jsonb_build_object('branch', p.branch_id, 'businessDate', p_date,
     'cash', coalesce(p_cash,0), 'transfer', coalesce(p_transfer,0), 'card', coalesce(p_card,0),
     'chowdeck', coalesce(p_chowdeck,0), 'app', coalesce(p_app,0),
-    'deliveryFees', fees, 'deliveryTotal', total_fees, 'transferManual', true,
-    'witness', w.full_name, 'witnessId', w.id, 'photos', coalesce(p_photos, '{}'::jsonb), 'note', p_note), 'cashier');
+    'deliveryFees', fees, 'deliveryTotal', total_fees, 'refunds', refunds, 'refundTotal', total_refunds,
+    'transferManual', true, 'witness', w.full_name, 'witnessId', w.id,
+    'photos', coalesce(p_photos, '{}'::jsonb), 'note', nullif(trim(p_note), '')), 'cashier');
 end $$;
 
 create or replace function public.submit_aronium_total(p_date date, p_total numeric, p_photo text)
 returns void language plpgsql security definer set search_path = public, pg_temp as $$
-declare p profiles := _me();
+declare p profiles := _me(); role text;
 begin
-  perform _need(p, 'branch_manager');
+  perform _need(p, 'cashier', 'branch_manager');
+  role := case when _has(p, 'cashier') then 'cashier' else 'branch_manager' end;
   if p.branch_id is null then raise exception 'Your account has no branch. Ask the owner.'; end if;
   if p_date is null or p_date > lagos_today() or p_date < lagos_today() - 1 then
     raise exception 'The date must be today or yesterday.'; end if;
   if p_total is null or p_total < 0 then raise exception 'Enter Aronium''s total sales.'; end if;
   if p_photo is null then raise exception 'Add a photo of the Aronium end-of-day report.'; end if;
+  -- The money received is locked in first, so it can't be adjusted to match Aronium.
+  if not exists (select 1 from events where type = 'CASH_EOD' and location_id = p.branch_id and data->>'businessDate' = p_date::text) then
+    raise exception 'Submit the money received for this date first.'; end if;
   if exists (select 1 from events where type = 'ARONIUM_TOTAL' and location_id = p.branch_id and data->>'businessDate' = p_date::text) then
     raise exception 'Aronium''s total for this date was already submitted.'; end if;
   perform _emit(p, 'ARONIUM_TOTAL', p.branch_id, jsonb_build_object('branch', p.branch_id, 'businessDate', p_date,
-    'total', round(p_total, 2), 'photoPath', p_photo), 'branch_manager');
+    'total', round(p_total, 2), 'photoPath', p_photo), role);
 end $$;
 
 -- What has this person already submitted today (so forms can say "done").

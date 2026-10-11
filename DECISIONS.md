@@ -2,6 +2,17 @@
 
 The design decisions come from [`docs/BUILD_SPEC.md`](docs/BUILD_SPEC.md). This file records choices made while building, and anything that differs from the spec. Newest first.
 
+## 2026-10-11: Money end of day: owner's answers
+
+| Decision | Detail |
+| --- | --- |
+| **All five money sources are entered by the cashier**, with a photo or screenshot each. | Moniepoint terminals and the restaurant's own app are not to be connected. Chowdeck is third-party. |
+| **Chowdeck and App amounts are the full order value**, as Aronium records them. | So the totals compare like for like. (Assumed from "same as delivery fees"; confirm with the owner.) |
+| **Delivery fees are listed per order by the cashier.** | Unchanged. |
+| **The cashier also enters Aronium's total, in two steps.** Step 1 locks the money received; only then does step 2 accept Aronium's total, with a photo of the report. | Owner's choice until the branch laptops are integrated. Risk: one person holds both sides. Mitigations: the photo (owner checks it), money locked before Aronium, and kitchen stock gaps reveal unrecorded sales. |
+| **Refunds** (order no., amount, reason) and a **note for exceptions**. Every refund or note raises a `CASHIER_NOTE` alert, appears on the owner's Today screen and in the money report, with "difference if the refunds explain it". | Owner asked to be alerted to exceptions and refunds. |
+| **Money alert threshold stays at ₦500.** | Owner confirmed. |
+
 ## 2026-10-09: Branch names
 
 The branches are **Tanke branch** (id `tanke`) and **Adeta branch** (id `adeta`). The placeholder "Branch 2" is gone. Names carry the word "branch" and differ from the first letter on, so they can't be confused on screen. Ids never change, so renaming a branch later never breaks past records.

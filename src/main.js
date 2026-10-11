@@ -105,7 +105,7 @@ document.addEventListener('click', async ev => {
   const tab = tabsFor(S.me).find(t => t.id === S.tab);
   const fn = tab && tab.act && tab.act[name]; if (!fn) return;
   const label = b.textContent; b.disabled = true;
-  if (!['addfee', 'rmfee', 'correct'].includes(name)) b.textContent = 'Saving…';
+  if (!['addfee', 'rmfee', 'addrefund', 'rmrow', 'correct'].includes(name)) b.textContent = 'Saving…';
   try {
     const r = await fn(S, b);
     if (r === 'stay') { b.disabled = false; b.textContent = label; return; }

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0 (2026-10-11)
+
+- Cashier end of day in two steps: (1) money received, locked; (2) Aronium total with photo. Branch manager no longer enters Aronium's total.
+- Refunds (order no., amount, reason) and a note for exceptions; the owner is alerted for each, sees them on Today and in the money report.
+- Chowdeck and App labelled "full order value".
+- Database: `submit_cash_eod` takes refunds; `submit_aronium_total` accepts the cashier and requires the money first.
+
 ## 0.1.1 (2026-10-09)
 
 - Branches named **Tanke branch** and **Adeta branch**. `setup.sql` now also fixes a database set up with the old "Branch 2" placeholder.
