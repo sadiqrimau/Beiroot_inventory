@@ -59,6 +59,7 @@ const store = {
     const grn = d.purchases.length ? d.purchases.map(p => `<div class="card"><h3>${esc(p.poId)} <small>from ${esc(p.supplier || 'supplier')}, bought by ${esc(p.buyer)}</small></h3>
         <p class="lede">Count what actually arrived. The purchase quantities are hidden on purpose.</p>
         ${lineEditor('grn-' + p.poId, S.items, (p.items || []).map(i => ({ code: i.code })), { blind: true, expiry: true })}
+        ${photoField('grn-ph-' + p.poId, 'Photo of the goods received', !S.paper)}
         ${S.paper ? paperFields('grn-' + p.poId) : ''}
         <button class="primary" data-act="grn" data-po="${esc(p.poId)}">Confirm goods received</button></div>`).join('')
       : '<p class="empty">No purchases waiting to be received.</p>';
@@ -67,6 +68,7 @@ const store = {
         ${lineEditor('rel-' + q.reqId, S.items, q.lines)}
         ${q.dest === 'kitchen' ? `<p class="lede">Handed to ${esc(q.by)} in the kitchen.</p>`
           : `<label>Driver carrying it<select id="rel-drv-${esc(q.reqId)}"><option value="">Choose…</option>${drivers.filter(x => x.id !== q.byId).map(x => `<option value="${x.id}">${esc(x.full_name)}</option>`).join('')}</select></label>`}
+        ${photoField('rel-ph-' + q.reqId, 'Photo of the stock being released', !S.paper)}
         ${S.paper ? paperFields('rel-' + q.reqId) : ''}
         <button class="primary" data-act="release" data-req="${esc(q.reqId)}" data-dest="${esc(q.dest)}">Release stock</button></div>`).join('')
       : '<p class="empty">No open requests.</p>';
@@ -79,6 +81,7 @@ const store = {
         <label>Why it could not wait<input id="em-reason"></label>
         ${staffSelect('em-driver', S.staff, { roles: ['driver'], label: 'Driver' })}
         ${lineEditor('em-lines', S.items)}
+        ${photoField('em-photo', 'Photo of the stock being released', true)}
         <button class="danger" data-act="emergency">Release as emergency</button></details>
       ${writeOffCard(S, 'store', 'Write off spoiled or damaged stock')}</section>`;
   },
@@ -88,15 +91,24 @@ const store = {
       toast('Store opened and logged.'); },
     async close() { await rpc('store_close'); toast('Store closed.'); },
     async grn(S, b) { const po = b.dataset.po; const lines = readLines('grn-' + po, { requireAll: true });
-      await rpc('confirm_grn', { p_po: po, p_lines: lines, ...paperArgs(S, 'grn-' + po) }); toast(po + ' received.'); },
+      const pa = paperArgs(S, 'grn-' + po), f = file('grn-ph-' + po);
+      need(S.paper || S.data.store?.status?.open, 'Open the store first.');
+      if (!S.paper) need(f, 'Add a photo of the goods received.');
+      const photo = f ? await uploadPhoto(f, S.me.id) : null;
+      await rpc('confirm_grn', { p_po: po, p_lines: lines, ...pa, p_photo: photo }); toast(po + ' received.'); },
     async release(S, b) { const rq = b.dataset.req; const lines = readLines('rel-' + rq); need(lines.length, 'Nothing to release.');
       let carrier = null;
       if (b.dataset.dest !== 'kitchen') { carrier = val('rel-drv-' + rq); need(carrier, 'Choose the driver.'); }
-      const mv = await rpc('release_stock', { p_req: rq, p_lines: lines, p_carrier: carrier, ...paperArgs(S, 'rel-' + rq) });
+      const pa = paperArgs(S, 'rel-' + rq), f = file('rel-ph-' + rq);
+      need(S.paper || S.data.store?.status?.open, 'Open the store first.');
+      if (!S.paper) need(f, 'Add a photo of the stock being released.');
+      const photo = f ? await uploadPhoto(f, S.me.id) : null;
+      const mv = await rpc('release_stock', { p_req: rq, p_lines: lines, p_carrier: carrier, ...pa, p_photo: photo });
       toast(`Released as ${mv}. Write ${mv} in the paper book.`); },
     async emergency() { const lines = readLines('em-lines'); need(lines.length, 'Add the items.');
-      need(val('em-reason'), 'Give the reason.'); need(val('em-driver'), 'Choose the driver.');
-      const mv = await rpc('emergency_release', { p_dest: val('em-dest'), p_reason: val('em-reason'), p_lines: lines, p_carrier: val('em-driver') });
+      need(val('em-reason'), 'Give the reason.'); need(val('em-driver'), 'Choose the driver.'); need(file('em-photo'), 'Add a photo of the stock being released.');
+      const photo = await uploadPhoto(file('em-photo'), S.me.id);
+      const mv = await rpc('emergency_release', { p_dest: val('em-dest'), p_reason: val('em-reason'), p_lines: lines, p_carrier: val('em-driver'), p_photo: photo });
       toast(`Emergency release ${mv} logged for the owner's review.`); },
     writeoff: doWriteOff,
   },
@@ -105,10 +117,16 @@ const store = {
 // ---------------- Procurement officer ----------------
 const buy = {
   id: 'buy', label: 'Purchases', roles: ['buyer'],
-  async load() { return { mine: await rpc('my_purchases') }; },
+  async load() { const [mine, low] = await Promise.all([rpc('my_purchases'), rpc('low_stock')]); return { mine, low }; },
   view(S, d) {
     const raw = S.items.filter(i => i.kind === 'raw');
-    return `<section><div class="card"><h3>Log a purchase</h3>
+    const low = d.low || [];
+    const lowCard = low.length ? `<div class="card low"><h3>Low stock in the store <span class="tag bad">${low.length}</span></h3>
+      <p class="lede">These items are at or below the level the owner set for reordering. Check with the storekeeper how much to buy.</p>
+      <ul class="plain">${low.map(i => `<li><b>${esc(i.name)}</b> <small>${esc(i.category)} · reorder at ${num(i.reorderLevel)} ${esc(i.unit || '')}</small>
+        ${i.ordered ? '<span class="tag ok">Bought, waiting for the storekeeper</span>' : ''}</li>`).join('')}</ul></div>`
+      : `<p class="done">No items are low in the store.</p>`;
+    return `<section>${lowCard}<div class="card"><h3>Log a purchase</h3>
       <label>Supplier<input id="po-supplier"></label>
       ${lineEditor('po-lines', raw, null, { purchaseUnits: true })}
       ${photoField('po-invoice', 'Photo of the invoice or receipt', false)}
@@ -230,7 +248,11 @@ const cash = {
   view(S, d) {
     const days = [[lagosDate(), 'Today, ' + fmtD(lagosDate()), d.t], [yesterday(), 'Yesterday, ' + fmtD(yesterday()), d.y]];
     const needMoney = days.filter(([, , x]) => !x.cashEod);
-    const needAron = days.filter(([, , x]) => x.cashEod && !x.aroniumTotal);
+    const auto = d.t.aroniumAuto;
+    const needAron = auto ? [] : days.filter(([, , x]) => x.cashEod && !x.aroniumTotal);
+    if (auto && d.t.cashEod) return `<section><h2>End of day · ${esc(S.me.branch_name || '')}</h2><p class="done">Today's money received is saved. Thank you.</p>
+      <p class="lede">Remember to close the register in Aronium. Its report is sent to the owner automatically; there is nothing to print.
+      ${d.t.aroniumTotal ? '<br><span class="tag ok">Aronium report received</span>' : ''}</p></section>`;
     if (!needAron.length && d.t.cashEod) return `<section><h2>End of day · ${esc(S.me.branch_name || '')}</h2><p class="done">Today's end of day is complete. Thank you.</p></section>`;
     // Step 2 comes first on screen when step 1 is done for a day.
     if (needAron.length) return `<section><h2>End of day · ${esc(S.me.branch_name || '')}</h2>
@@ -242,13 +264,14 @@ const cash = {
         ${photoField('ar-photo', 'Photo of the Aronium report', true)}
         <button class="primary" data-act="aronium">Submit Aronium total</button></div></section>`;
     return `<section><h2>End of day · ${esc(S.me.branch_name || '')}</h2>
-      <div class="card"><h3>Step 1 of 2: money received</h3>
-      <p class="lede">Count the cash with the branch manager watching. Enter each amount and add its photo or screenshot. You can't change it after submitting. You enter the Aronium total after this.</p>
+      <div class="card"><h3>${auto ? 'Money received' : 'Step 1 of 2: money received'}</h3>
+      <p class="lede">Count the cash with the branch manager watching. Enter each amount and add its photo or screenshot. You can't change it after submitting. ${auto
+        ? 'Close the register in Aronium as usual: its report goes to the owner automatically, with no printing.' : 'You enter the Aronium total after this.'}</p>
       <label>Date<select id="ce-date">${needMoney.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label></div>
       ${MONEY.map(([k, l, hint]) => `<div class="card money"><label>${esc(l)} (₦)${hint ? ` <small>${esc(hint)}</small>` : ''}<input type="number" inputmode="decimal" min="0" id="ce-${k}" placeholder="0"></label>
         ${photoField('ce-ph-' + k, k === 'cash' ? 'Photo of the counted cash' : 'Screenshot (needed if the amount is more than 0)', true)}</div>`).join('')}
       ${staffSelect('ce-witness', S.staff, { exclude: S.me.id, roles: ['branch_manager', 'owner', 'admin'], label: 'Who watched the cash count', branch: S.me.branch_id })}
-      <div class="card"><h3>Delivery fees</h3><p class="lede">One line per delivery order: the order number and the fee the customer paid.</p>
+      <div class="card"><h3>Delivery fees</h3><p class="lede">One line per delivery order: the order number, the fee the customer paid, and how they paid it.</p>
         <div id="ce-fees"></div><button type="button" class="ghost" data-act="addfee">Add delivery</button></div>
       <div class="card"><h3>Refunds</h3><p class="lede">Money given back to a customer today: the order number, the amount and why. The owner is alerted for every refund.</p>
         <div id="ce-refunds"></div><button type="button" class="ghost" data-act="addrefund">Add refund</button></div>
@@ -256,7 +279,8 @@ const cash = {
       <button class="primary" data-act="cashEod">Submit money received</button></section>`;
   },
   act: {
-    addfee() { $('#ce-fees').insertAdjacentHTML('beforeend', rowHtml('', `<input placeholder="Order no." class="fee-ref"><input type="number" inputmode="decimal" min="0" placeholder="₦" class="fee-amt">`)); return 'stay'; },
+    addfee() { $('#ce-fees').insertAdjacentHTML('beforeend', rowHtml('', `<input placeholder="Order no." class="fee-ref"><input type="number" inputmode="decimal" min="0" placeholder="₦" class="fee-amt">
+      <select class="fee-how" aria-label="Paid by"><option value="">Paid by…</option>${MONEY.map(([k, l]) => `<option value="${k}">${esc(l.replace(/ \(.*\)/, ''))}</option>`).join('')}</select>`)); return 'stay'; },
     addrefund() { $('#ce-refunds').insertAdjacentHTML('beforeend', rowHtml('refund', `<input placeholder="Order no." class="rf-ref"><input type="number" inputmode="decimal" min="0" placeholder="₦" class="rf-amt"><input placeholder="Reason" class="rf-why">`)); return 'stay'; },
     rmrow(S, b) { b.closest('.fee').remove(); return 'stay'; },
     rmfee(S, b) { b.closest('.fee').remove(); return 'stay'; },
@@ -264,8 +288,8 @@ const cash = {
       const amt = {}; MONEY.forEach(([k]) => { amt[k] = Number(val('ce-' + k) || 0); need(amt[k] >= 0, 'Amounts cannot be negative.'); });
       need(val('ce-cash') !== '', 'Enter the cash amount (0 if none).');
       need(val('ce-witness'), 'Choose who watched the cash count.');
-      const fees = [...document.querySelectorAll('#ce-fees .fee')].map(f => ({ ref: f.querySelector('.fee-ref').value.trim(), amount: Number(f.querySelector('.fee-amt').value || 0) })).filter(f => f.ref || f.amount);
-      fees.forEach(f => need(f.amount > 0, 'Each delivery needs its fee.'));
+      const fees = [...document.querySelectorAll('#ce-fees .fee')].map(f => ({ ref: f.querySelector('.fee-ref').value.trim(), amount: Number(f.querySelector('.fee-amt').value || 0), method: f.querySelector('.fee-how').value || null })).filter(f => f.ref || f.amount);
+      fees.forEach(f => { need(f.amount > 0, 'Each delivery needs its fee.'); need(f.method, 'Choose how each delivery fee was paid.'); });
       const refunds = [...document.querySelectorAll('#ce-refunds .fee')].map(f => ({ ref: f.querySelector('.rf-ref').value.trim(), amount: Number(f.querySelector('.rf-amt').value || 0), reason: f.querySelector('.rf-why').value.trim() })).filter(f => f.ref || f.amount || f.reason);
       refunds.forEach(f => { need(f.amount > 0, 'Each refund needs its amount.'); need(f.reason, 'Each refund needs a reason.'); });
       const photos = {};
@@ -278,7 +302,7 @@ const cash = {
       await rpc('submit_cash_eod', { p_date: val('ce-date'), p_cash: amt.cash, p_transfer: amt.transfer, p_card: amt.card,
         p_chowdeck: amt.chowdeck, p_app: amt.app, p_delivery_fees: fees, p_witness: val('ce-witness'), p_photos: photos,
         p_note: val('ce-note') || null, p_refunds: refunds });
-      toast('Money received saved. Now enter the Aronium total.');
+      toast((await rpc('my_submissions')).aroniumAuto ? 'Money received saved. Close the register in Aronium as usual.' : 'Money received saved. Now enter the Aronium total.');
     },
     async aronium(S) {
       need(val('ar-total') !== '', 'Enter the Aronium total.'); need(file('ar-photo'), 'Add a photo of the Aronium report.');

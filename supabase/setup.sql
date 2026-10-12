@@ -355,9 +355,10 @@ begin
       and not exists (select 1 from events g where g.type = 'GRN' and g.data->>'poId' = e.data->>'poId')), '[]'::json);
 end $$;
 
--- Lines: [{code, qty, expiry?}] counted at the door.
+-- Lines: [{code, qty, expiry?}] counted at the door. A photo of the goods is required (except paper-book entries).
+drop function if exists public.confirm_grn(text, jsonb, timestamptz, text);
 create or replace function public.confirm_grn(p_po text, p_lines jsonb,
-  p_occurred timestamptz default null, p_paper_page text default null)
+  p_occurred timestamptz default null, p_paper_page text default null, p_photo text default null)
 returns void language plpgsql security definer set search_path = public, pg_temp as $$
 declare p profiles := _me(); pur events;
 begin
@@ -368,7 +369,8 @@ begin
     raise exception 'Purchase % was already received.', p_po; end if;
   if pur.actor_id = p.id then raise exception 'You logged this purchase, so someone else must confirm it.'; end if;
   if p_paper_page is null and _open_session() is null then raise exception 'Open the store first.'; end if;
-  perform _emit(p, 'GRN', 'store', jsonb_build_object('poId', p_po, 'lines', _lines(p_lines, true)),
+  if p_paper_page is null and p_photo is null then raise exception 'Add a photo of the goods received.'; end if;
+  perform _emit(p, 'GRN', 'store', jsonb_build_object('poId', p_po, 'lines', _lines(p_lines, true), 'photoPath', p_photo),
     'storekeeper', p_occurred, p_paper_page);
 end $$;
 
@@ -407,8 +409,9 @@ end $$;
 
 -- ---------- Releases (storekeeper) ---------------------------------------
 
+drop function if exists public.release_stock(text, jsonb, uuid, timestamptz, text);
 create or replace function public.release_stock(p_req text, p_lines jsonb, p_carrier uuid,
-  p_occurred timestamptz default null, p_paper_page text default null)
+  p_occurred timestamptz default null, p_paper_page text default null, p_photo text default null)
 returns text language plpgsql security definer set search_path = public, pg_temp as $$
 declare p profiles := _me(); rq events; c profiles; mv text; d jsonb;
 begin
@@ -418,8 +421,9 @@ begin
   if exists (select 1 from events where type = 'RELEASE' and data->>'reqId' = p_req) then
     raise exception 'Request % was already released.', p_req; end if;
   if p_paper_page is null and _open_session() is null then raise exception 'Open the store first.'; end if;
+  if p_paper_page is null and p_photo is null then raise exception 'Add a photo of the stock being released.'; end if;
   mv := 'MOV-' || lpad(nextval('mov_seq')::text, 5, '0');
-  d := jsonb_build_object('movId', mv, 'reqId', p_req, 'dest', rq.data->>'dest', 'lines', _lines(p_lines));
+  d := jsonb_build_object('movId', mv, 'reqId', p_req, 'dest', rq.data->>'dest', 'lines', _lines(p_lines), 'photoPath', p_photo);
   if rq.data->>'dest' = 'kitchen' then
     d := d || jsonb_build_object('receivedBy', rq.actor_name, 'receivedById', rq.actor_id);
   else
@@ -432,7 +436,9 @@ begin
   return mv;
 end $$;
 
-create or replace function public.emergency_release(p_dest text, p_reason text, p_lines jsonb, p_carrier uuid)
+drop function if exists public.emergency_release(text, text, jsonb, uuid);
+create or replace function public.emergency_release(p_dest text, p_reason text, p_lines jsonb, p_carrier uuid,
+  p_photo text default null)
 returns text language plpgsql security definer set search_path = public, pg_temp as $$
 declare p profiles := _me(); c profiles; mv text;
 begin
@@ -441,11 +447,13 @@ begin
     raise exception 'Choose a branch.'; end if;
   if coalesce(trim(p_reason), '') = '' then raise exception 'Give the reason it could not wait.'; end if;
   if _open_session() is null then raise exception 'Open the store first.'; end if;
+  if p_photo is null then raise exception 'Add a photo of the stock being released.'; end if;
   c := _profile(p_carrier);
   if not _has(c, 'driver') then raise exception '% is not a driver.', c.full_name; end if;
   mv := 'MOV-' || lpad(nextval('mov_seq')::text, 5, '0');
   perform _emit(p, 'RELEASE', 'store', jsonb_build_object('movId', mv, 'reqId', null, 'dest', p_dest,
-    'reason', trim(p_reason), 'carrier', c.full_name, 'carrierId', c.id, 'lines', _lines(p_lines)), 'storekeeper');
+    'reason', trim(p_reason), 'carrier', c.full_name, 'carrierId', c.id, 'lines', _lines(p_lines),
+    'photoPath', p_photo), 'storekeeper');
   return mv;
 end $$;
 
@@ -607,7 +615,10 @@ begin
   if coalesce(jsonb_typeof(p_delivery_fees), 'null') = 'array' then
     for f in select * from jsonb_array_elements(p_delivery_fees) loop
       if coalesce((f->>'amount')::numeric, 0) <= 0 then raise exception 'Each delivery fee needs an amount.'; end if;
-      fees := fees || jsonb_build_object('ref', coalesce(f->>'ref', ''), 'amount', round((f->>'amount')::numeric, 2));
+      if (f->>'method') is not null and (f->>'method') not in ('cash','transfer','card','chowdeck','app') then
+        raise exception 'Choose how each delivery fee was paid.'; end if;
+      fees := fees || jsonb_build_object('ref', coalesce(f->>'ref', ''), 'amount', round((f->>'amount')::numeric, 2),
+        'method', f->>'method');
       total_fees := total_fees + (f->>'amount')::numeric;
     end loop;
   end if;
@@ -642,6 +653,8 @@ begin
   if p_date is null or p_date > lagos_today() or p_date < lagos_today() - 1 then
     raise exception 'The date must be today or yesterday.'; end if;
   if p_total is null or p_total < 0 then raise exception 'Enter Aronium''s total sales.'; end if;
+  if exists (select 1 from sync_devices where branch_id = p.branch_id and active) then
+    raise exception 'This branch sends Aronium''s report automatically. Just close the register in Aronium.'; end if;
   if p_photo is null then raise exception 'Add a photo of the Aronium end-of-day report.'; end if;
   -- The money received is locked in first, so it can't be adjusted to match Aronium.
   if not exists (select 1 from events where type = 'CASH_EOD' and location_id = p.branch_id and data->>'businessDate' = p_date::text) then
@@ -661,7 +674,9 @@ begin
     'kitchenCount', exists (select 1 from events where type = 'KITCHEN_COUNT' and location_id = p.branch_id
                             and (occurred_at at time zone 'Africa/Lagos')::date = d),
     'cashEod', exists (select 1 from events where type = 'CASH_EOD' and location_id = p.branch_id and data->>'businessDate' = d::text),
-    'aroniumTotal', exists (select 1 from events where type = 'ARONIUM_TOTAL' and location_id = p.branch_id and data->>'businessDate' = d::text));
+    'aroniumTotal', exists (select 1 from events where type in ('ARONIUM_TOTAL','ARONIUM_ZREPORT') and location_id = p.branch_id
+                            and data->>'businessDate' = d::text),
+    'aroniumAuto', exists (select 1 from sync_devices where branch_id = p.branch_id and active));
 end $$;
 
 -- ---------- Owner -----------------------------------------------------------
@@ -1009,3 +1024,246 @@ insert into public.menu_items (id, category, name, size, price, sort, note) valu
   ('dip-thousand-island',     'Dips',            'Thousand island',                           null,       500, 83, null),
   ('drink-slush',             'Drinks',          'Slush',                                     'Cup',     2000, 90, null)
 on conflict (id) do nothing;
+
+-- Not on the posters; the owner sets the prices in Settings → Menu.
+insert into public.menu_items (id, category, name, size, price, sort, note) values
+  ('side-crispy-meal',        'Sides',           'Crispy meal',                               null,      null, 56, 'Price to be set by the owner'),
+  ('side-extra-fries',        'Sides',           'Extra fries',                               null,      null, 57, 'Price to be set by the owner')
+on conflict (id) do nothing;
+
+-- ---------- Aronium sync (branch laptops) --------------------------------------
+-- Each branch laptop runs a small program that reads Aronium's own database (read-only)
+-- and sends each closed register (Z report) here. The laptop holds a key; only its
+-- SHA-256 hash is stored. Reports are written to the ledger as ARONIUM_ZREPORT.
+
+create table if not exists public.sync_devices (
+  id            uuid primary key default gen_random_uuid(),
+  branch_id     text not null references public.locations(id),
+  name          text not null,
+  key_hash      text not null unique,
+  active        boolean not null default true,
+  created_at    timestamptz not null default now(),
+  created_by    uuid,
+  last_seen_at  timestamptz,
+  last_status   jsonb
+);
+
+-- Item names as they appear in each branch's Aronium (refreshed by the laptop).
+create table if not exists public.aronium_products (
+  branch_id     text not null references public.locations(id),
+  norm          text not null,
+  name          text not null,
+  price         numeric,
+  grp           text,
+  enabled       boolean,
+  last_seen_at  timestamptz not null default now(),
+  primary key (branch_id, norm)
+);
+
+-- Aronium names linked by the owner to a menu item (one menu for all branches).
+create table if not exists public.menu_aliases (
+  norm          text primary key,
+  alias         text not null,
+  menu_item_id  text not null references public.menu_items(id),
+  created_by    uuid,
+  created_at    timestamptz not null default now()
+);
+
+-- Names are matched ignoring case and extra spaces ("Chicken Wrap  " = "chicken wrap").
+create or replace function public.norm_name(t text) returns text language sql immutable as $$
+  select lower(regexp_replace(trim(coalesce(t, '')), '\s+', ' ', 'g'))
+$$;
+
+-- Owner/admin: register a laptop. The key is made in the owner's browser and shown once; only its hash comes here.
+create or replace function public.create_sync_device(p_branch text, p_name text, p_key_hash text)
+returns uuid language plpgsql security definer set search_path = public, pg_temp as $$
+declare p profiles := _me(); d uuid;
+begin
+  perform _need(p, 'owner', 'admin');
+  if not exists (select 1 from locations where id = p_branch and kind = 'branch') then raise exception 'Choose a branch.'; end if;
+  if coalesce(trim(p_name), '') = '' then raise exception 'Give the laptop a name.'; end if;
+  if p_key_hash is null or p_key_hash !~ '^[0-9a-f]{64}$' then raise exception 'Invalid key.'; end if;
+  insert into sync_devices(branch_id, name, key_hash, created_by) values (p_branch, trim(p_name), p_key_hash, p.id)
+    returning id into d;
+  return d;
+end $$;
+
+create or replace function public.set_sync_device_active(p_id uuid, p_active boolean)
+returns void language plpgsql security definer set search_path = public, pg_temp as $$
+declare p profiles := _me();
+begin
+  perform _need(p, 'owner', 'admin');
+  update sync_devices set active = coalesce(p_active, false) where id = p_id;
+  if not found then raise exception 'Laptop not found.'; end if;
+end $$;
+
+-- Owner/admin: link an Aronium item name to a menu item (or unlink with p_menu_item = null).
+create or replace function public.link_aronium_name(p_name text, p_menu_item text)
+returns void language plpgsql security definer set search_path = public, pg_temp as $$
+declare p profiles := _me(); n text := norm_name(p_name); old text;
+begin
+  perform _need(p, 'owner', 'admin');
+  if n = '' then raise exception 'Give the Aronium item name.'; end if;
+  select menu_item_id into old from menu_aliases where norm = n;
+  if p_menu_item is null then
+    if old is null then return; end if;
+    delete from menu_aliases where norm = n;
+    insert into menu_changes(menu_item_id, changed_by, field, old_value, new_value)
+      values (old, p.id, 'Aronium name unlinked', trim(p_name), null);
+    return;
+  end if;
+  if not exists (select 1 from menu_items where id = p_menu_item) then raise exception 'Menu item not found.'; end if;
+  if old is not distinct from p_menu_item then return; end if;
+  insert into menu_aliases(norm, alias, menu_item_id, created_by) values (n, trim(p_name), p_menu_item, p.id)
+    on conflict (norm) do update set alias = excluded.alias, menu_item_id = excluded.menu_item_id,
+      created_by = excluded.created_by, created_at = now();
+  if old is not null then
+    insert into menu_changes(menu_item_id, changed_by, field, old_value, new_value)
+      values (old, p.id, 'Aronium name moved to ' || p_menu_item, trim(p_name), null);
+  end if;
+  insert into menu_changes(menu_item_id, changed_by, field, old_value, new_value)
+    values (p_menu_item, p.id, 'Aronium name linked', null, trim(p_name));
+end $$;
+
+-- Called only by the server (api/aronium.js) with the hash of the laptop's key.
+create or replace function public._aronium_ingest(p_key_hash text, p_kind text, p_body jsonb)
+returns json language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  dev sync_devices; z jsonb; prev events; closed timestamp; bdate date; pay jsonb; k text; v numeric;
+  pr jsonb; n int := 0; body jsonb;
+begin
+  select * into dev from sync_devices where key_hash = p_key_hash;
+  if dev.id is null or not dev.active then raise exception 'unknown or revoked device'; end if;
+  update sync_devices set last_seen_at = now(),
+    last_status = case when p_kind = 'heartbeat' then p_body->'status' else last_status end
+  where id = dev.id;
+
+  if p_kind = 'heartbeat' then
+    return json_build_object('ok', true, 'branch', dev.branch_id);
+
+  elsif p_kind = 'products' then
+    for pr in select * from jsonb_array_elements(coalesce(p_body->'products', '[]'::jsonb)) limit 3000 loop
+      continue when norm_name(pr->>'name') = '';
+      insert into aronium_products(branch_id, norm, name, price, grp, enabled, last_seen_at)
+      values (dev.branch_id, norm_name(pr->>'name'), trim(pr->>'name'), (pr->>'price')::numeric, pr->>'group',
+              coalesce((pr->>'enabled')::boolean, true), now())
+      on conflict (branch_id, norm) do update set name = excluded.name, price = excluded.price, grp = excluded.grp,
+        enabled = excluded.enabled, last_seen_at = now();
+      n := n + 1;
+    end loop;
+    return json_build_object('ok', true, 'products', n);
+
+  elsif p_kind = 'zreport' then
+    z := p_body->'report';
+    if z is null or (z->>'zId') is null or (z->>'closedAt') is null then raise exception 'report incomplete'; end if;
+    closed := (z->>'closedAt')::timestamp;                     -- Aronium's local (Lagos) time
+    bdate := (closed - interval '6 hours')::date;              -- closed before 6am = the previous business day
+    -- Payments by type, mapped to the cashier's five sources.
+    pay := '{"cash":0,"card":0,"transfer":0,"app":0,"chowdeck":0,"other":0}'::jsonb;
+    for k, v in select norm_name(x->>'name'), coalesce((x->>'amount')::numeric, 0)
+                from jsonb_array_elements(coalesce(z->'payments', '[]'::jsonb)) x loop
+      k := case when k like '%cash%' then 'cash' when k like '%card%' or k like '%pos%' then 'card'
+                when k like '%transfer%' or k like '%bank%' then 'transfer' when k like '%chowdeck%' then 'chowdeck'
+                when k = 'app' or k like '%app%' then 'app' else 'other' end;
+      pay := jsonb_set(pay, array[k], to_jsonb(round((pay->>k)::numeric + v, 2)));
+    end loop;
+    body := jsonb_build_object('branch', dev.branch_id, 'businessDate', bdate,
+      'zId', (z->>'zId')::bigint, 'zNumber', (z->>'zNumber')::bigint, 'closedAt', z->>'closedAt',
+      'fromDoc', z->'fromDoc', 'toDoc', z->'toDoc', 'payments', pay, 'paymentsRaw', coalesce(z->'payments', '[]'::jsonb),
+      'total', round((pay->>'cash')::numeric + (pay->>'card')::numeric + (pay->>'transfer')::numeric
+                     + (pay->>'app')::numeric + (pay->>'chowdeck')::numeric + (pay->>'other')::numeric, 2),
+      'salesTotal', z->'salesTotal', 'salesCount', z->'salesCount', 'refundTotal', z->'refundTotal',
+      'refundCount', z->'refundCount', 'docCount', z->'docCount', 'missingDocs', coalesce((z->>'missingDocs')::int, 0),
+      'items', coalesce(z->'items', '[]'::jsonb), 'device', dev.name, 'deviceId', dev.id);
+    select * into prev from events where type = 'ARONIUM_ZREPORT' and location_id = dev.branch_id
+      and (data->>'zId')::bigint = (z->>'zId')::bigint order by seq limit 1;
+    if prev.id is not null then
+      if prev.data->'payments' = body->'payments' and prev.data->>'zNumber' = body->>'zNumber' then
+        return json_build_object('ok', true, 'duplicate', true);
+      end if;
+      -- Same register close sent again with different figures: keep the first, flag it.
+      if not exists (select 1 from events where type = 'SYNC_ALERT' and location_id = dev.branch_id
+                     and data->>'zId' = z->>'zId' and data->'report'->'payments' = body->'payments') then
+        insert into events(type, occurred_at, actor_id, actor_name, actor_role, location_id, source, data)
+        values ('SYNC_ALERT', now(), '00000000-0000-0000-0000-000000000000', 'Aronium sync (' || dev.name || ')',
+                'system', dev.branch_id, 'import',
+                jsonb_build_object('kind', 'conflict', 'zId', (z->>'zId')::bigint, 'firstRef', prev.id, 'report', body));
+      end if;
+      return json_build_object('ok', true, 'conflict', true);
+    end if;
+    insert into events(type, occurred_at, actor_id, actor_name, actor_role, location_id, source, data)
+    values ('ARONIUM_ZREPORT', least(closed at time zone 'Africa/Lagos', now()), '00000000-0000-0000-0000-000000000000',
+            'Aronium sync (' || dev.name || ')', 'system', dev.branch_id, 'import', body);
+    return json_build_object('ok', true, 'businessDate', bdate);
+  end if;
+  raise exception 'unknown kind';
+end $$;
+
+-- ---------- Low stock (procurement officer) -----------------------------------
+-- Store balance per item: the latest independent count, plus everything since.
+create or replace function public._store_balance() returns table(item_id text, qty numeric)
+language sql stable security definer set search_path = public, pg_temp as $$
+  with base as (
+    select distinct on (l->>'code') l->>'code' as code, (l->>'qty')::numeric as q, e.occurred_at as at, e.seq
+    from events e cross join lateral jsonb_array_elements(e.data->'lines') l
+    where e.type = 'COUNT' and e.location_id = 'store' and e.data->>'custodian' is distinct from e.actor_name
+    order by l->>'code', e.occurred_at desc, e.seq desc
+  ), mv as (
+    select x.code, x.q, e.occurred_at as at, e.seq
+    from events e cross join lateral (
+      select l->>'code' as code,
+             (l->>'qty')::numeric * case when e.type in ('RELEASE','WASTE','USE') then -1 else 1 end as q
+      from jsonb_array_elements(case when e.type = 'YIELD' then e.data->'outputs' else e.data->'lines' end) l) x
+    where e.type in ('GRN','RELEASE','YIELD')
+       or (e.type in ('WASTE','USE','CORRECTION') and e.location_id = 'store')
+  )
+  select i.id, round(coalesce(b.q, 0) + coalesce((select sum(m.q) from mv m where m.code = i.id
+           and (b.code is null or (m.at, m.seq) > (b.at, b.seq))), 0), 2)
+  from items i left join base b on b.code = i.id
+$$;
+
+-- Items at or below their reorder level. Names only: staff never see stock quantities.
+create or replace function public.low_stock() returns json
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare p profiles := _me();
+begin
+  perform _need(p, 'buyer', 'owner', 'admin');
+  return coalesce((select json_agg(json_build_object('code', i.id, 'name', i.name, 'category', i.category,
+      'unit', i.count_unit, 'purchaseUnit', i.purchase_unit, 'reorderLevel', i.reorder_level,
+      'ordered', exists (select 1 from events e where e.type = 'PURCHASE' and e.data->'lines' @> jsonb_build_array(jsonb_build_object('code', i.id))
+                         and not exists (select 1 from events g where g.type = 'GRN' and g.data->>'poId' = e.data->>'poId')))
+      order by i.category, i.name)
+    from items i join _store_balance() b on b.item_id = i.id
+    where i.active and i.reorder_level is not null and b.qty <= i.reorder_level), '[]'::json);
+end $$;
+
+alter table public.sync_devices     enable row level security;
+alter table public.aronium_products enable row level security;
+alter table public.menu_aliases     enable row level security;
+drop policy if exists sync_devices_read on public.sync_devices;
+create policy sync_devices_read on public.sync_devices for select to authenticated using (is_reviewer());
+drop policy if exists aronium_products_read on public.aronium_products;
+create policy aronium_products_read on public.aronium_products for select to authenticated using (is_reviewer());
+drop policy if exists menu_aliases_read on public.menu_aliases;
+create policy menu_aliases_read on public.menu_aliases for select to authenticated using (is_reviewer());
+revoke all on public.sync_devices, public.aronium_products, public.menu_aliases from anon, authenticated;
+grant select on public.sync_devices, public.aronium_products, public.menu_aliases to authenticated;
+
+-- Functions: signed-in users only; internal helpers not callable from the app (covers everything above).
+do $$
+declare f record;
+begin
+  for f in select p.oid::regprocedure as sig, p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.prokind = 'f' loop
+    execute format('revoke all on function %s from public, anon', f.sig);
+    if f.proname like '\_%' then
+      execute format('revoke all on function %s from authenticated', f.sig);
+    else
+      execute format('grant execute on function %s to authenticated', f.sig);
+    end if;
+  end loop;
+  -- The Aronium endpoint calls in with the service key.
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    execute 'grant execute on function public._aronium_ingest(text, text, jsonb) to service_role';
+  end if;
+end $$;

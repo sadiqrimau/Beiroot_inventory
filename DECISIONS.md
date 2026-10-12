@@ -2,6 +2,22 @@
 
 The design decisions come from [`docs/BUILD_SPEC.md`](docs/BUILD_SPEC.md). This file records choices made while building, and anything that differs from the spec. Newest first.
 
+## 2026-10-12: Aronium sync, storekeeper photos, low stock
+
+| Decision | Detail |
+| --- | --- |
+| **Each branch laptop sends Aronium's end-of-day report automatically** (`sync/`). The cashier only closes the register; nothing is printed. | Owner did not want the report printed (leaks). The laptops are Windows with internet. A small PowerShell program reads Aronium's `pos.db` **read-only** with Aronium's own SQLite reader and posts to `api/aronium.js` every 5 minutes. |
+| **Laptop keys**: made in the owner's browser (Settings → Aronium sync), shown once; only the SHA-256 hash is stored (`sync_devices`). Revoking a key stops that laptop. | A stolen key can only send reports for its own branch. All checks and the ledger write are in the database (`_aronium_ingest`, callable only with the service key). |
+| **Report = `ARONIUM_ZREPORT` in the ledger** (source `import`): payments by type mapped to the five sources, sales and refund totals, items sold, and missing receipt numbers. **Business day** = the close time in Lagos; closed before 06:00 counts for the day before. | A close is stored once. Sent again with different figures → kept as first sent, `SYNC_CONFLICT` alert. |
+| **At a synced branch the cashier has no Aronium step**, and `submit_aronium_total` refuses. Branches without a laptop keep the manual step. | Removes the "cashier holds both sides" risk recorded on 2026-10-11. |
+| **Money is checked per payment type** when the report is automatic: counted − fees paid that way − Aronium's figure. The cashier now says how each delivery fee was paid. | Shows a payment rung up under the wrong type, and narrows a shortage to cash, transfer, etc. |
+| **New alerts**: `ARONIUM_GAP` (receipt numbers missing: a deleted sale), `ARONIUM_Z_SKIPPED` (a register close never arrived), `SYNC_CONFLICT`, `SYNC_OFFLINE` (laptop silent 3 h), `SYNC_ERROR`, `LOW_STOCK`. | |
+| **One menu for all branches, plus name links.** Aronium names match a menu item ignoring capitals and spaces, by "Name in Aronium" or a link the owner makes once (`menu_aliases`, logged in the change log). Unlinked names are listed in Settings → Menu. | Owner's answer: "uniform menu … can we implement both?" Names in Aronium have typos and trailing spaces. |
+| **Kitchen report "Sold (Aronium)"** = items sold × menu measurements; Reconciled / discrepancy per stock item (count tolerance). | Switches on per item as measurements are filled in. |
+| **Storekeeper photos are required** at goods received, releases and emergency releases (not for paper-book entries). | Friend's feedback: "photo upload by staff (mainly storekeeper)". Confirm with the owner these are the right moments. |
+| **Low stock goes to the procurement officer** as a list of item names and reorder levels only, plus "already bought". The store balance is never shown to staff. | Friend's feedback. Balance = last independent store count + movements since (`_store_balance`). Reorder levels set per item in Settings → Stock items. |
+| **Crispy meal and Extra fries** added to the menu with no price (owner sets it). | User's answer. |
+
 ## 2026-10-12: Menu
 
 - The owner manages the menu in **Settings → Menu**: add items, edit name/size/price, switch off (never delete). Seeded with the **orange menu posters** (37 items).

@@ -1,8 +1,9 @@
 import { PGlite } from '@electric-sql/pglite';
 import fs from 'fs';
+import crypto from 'crypto';
 const db = new PGlite();
 const stub = `
-create role anon; create role authenticated;
+create role anon; create role authenticated; create role service_role;
 create schema auth;
 create table auth.users (id uuid primary key);
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
@@ -49,7 +50,8 @@ await as('store', "select store_open('again')", [], 'already open');
 const po = await one('buyer', `select log_purchase('Mile 12', '[{"code":"chicken","qty":20,"unitPrice":4500},{"code":"vegetable-oil","qty":2,"inPurchaseUnits":true}]'::jsonb)`);
 const pend = await one('store', 'select pending_purchases()');
 if (JSON.stringify(pend).includes('"qty"')) { fail++; console.log('FAIL pending_purchases leaks qty'); } else n++;
-await as('store', `select confirm_grn($1, '[{"code":"chicken","qty":18},{"code":"vegetable-oil","qty":2}]'::jsonb)`, [po]);
+await as('store', `select confirm_grn($1, '[{"code":"chicken","qty":18},{"code":"vegetable-oil","qty":2}]'::jsonb)`, [po], 'photo of the goods');
+await as('store', `select confirm_grn($1, '[{"code":"chicken","qty":18},{"code":"vegetable-oil","qty":2}]'::jsonb, p_photo => 'g.jpg')`, [po]);
 await as('store', `select confirm_grn($1, '[{"code":"chicken","qty":18}]'::jsonb)`, [po], 'already received');
 await as('store', `select confirm_grn('PO-9', '[{"code":"nope","qty":1}]'::jsonb)`, [], 'not found');
 // buyer who is also storekeeper cannot self-confirm
@@ -57,10 +59,12 @@ await as('store', `select confirm_grn('PO-9', '[{"code":"nope","qty":1}]'::jsonb
 const rq = await one('bm', `select raise_request('topup', '[{"code":"chicken","qty":5}]'::jsonb)`);
 await as('driver', `select raise_request('topup', '[{"code":"chicken","qty":5}]'::jsonb)`, [], 'role cannot');
 const reqs = await one('store', 'select open_requests()');
-const mv = await one('store', `select release_stock($1, '[{"code":"chicken","qty":5}]'::jsonb, $2)`, [rq, U.driver]);
-await as('store', `select release_stock($1, '[{"code":"chicken","qty":5}]'::jsonb, $2)`, [rq, U.driver], 'already released');
+await as('store', `select release_stock($1, '[{"code":"chicken","qty":5}]'::jsonb, $2)`, [rq, U.driver], 'photo of the stock');
+const mv = await one('store', `select release_stock($1, '[{"code":"chicken","qty":5}]'::jsonb, $2, p_photo => 'r.jpg')`, [rq, U.driver]);
+await as('store', `select release_stock($1, '[{"code":"chicken","qty":5}]'::jsonb, $2, p_photo => 'r.jpg')`, [rq, U.driver], 'already released');
+await as('store', `select emergency_release('adeta', 'ran out', '[{"code":"eggs","qty":1}]'::jsonb, $1)`, [U.driver], 'photo of the stock');
 const rq2 = await one('bm', `select raise_request('planned', '[{"code":"eggs","qty":2}]'::jsonb)`);
-await as('store', `select release_stock($1, '[{"code":"eggs","qty":2}]'::jsonb, $2)`, [rq2, U.cook], 'not a driver');
+await as('store', `select release_stock($1, '[{"code":"eggs","qty":2}]'::jsonb, $2, p_photo => 'r.jpg')`, [rq2, U.cook], 'not a driver');
 // Driver runs, branch incoming (blind)
 const runs = await one('driver', 'select my_runs()');
 const inc = await one('bm', 'select incoming_deliveries()');
@@ -71,7 +75,7 @@ await as('bm2', `select confirm_receipt($1, '[{"code":"chicken","qty":5}]'::json
 await as('bm', `select confirm_receipt($1, '[{"code":"chicken","qty":4}]'::jsonb, 'one short', 'u/p.jpg')`, [mv]);
 // Kitchen
 const kr = await one('cook', `select raise_request('production', '[{"code":"garlic-powder","qty":1}]'::jsonb)`);
-const km = await one('store', `select release_stock($1, '[{"code":"garlic-powder","qty":1}]'::jsonb, null)`, [kr]);
+const km = await one('store', `select release_stock($1, '[{"code":"garlic-powder","qty":1}]'::jsonb, null, p_photo => 'r.jpg')`, [kr]);
 const iss = await one('cook', 'select kitchen_open_issues()');
 await as('cook', `select report_yield(array[$1], '[{"code":"garlic-powder","qty":1}]'::jsonb, '[{"code":"chicken","qty":3}]'::jsonb)`, [km], 'not a kitchen-made');
 await as('cook', `select report_yield(array[$1], '[{"code":"garlic-powder","qty":1}]'::jsonb, '[{"code":"garlic-sauce","qty":3}]'::jsonb)`, [km]);
@@ -94,7 +98,7 @@ await as('kl', `select submit_count('store', '[{"code":"chicken","qty":3}]'::jso
 await as('cash', `select submit_cash_eod(lagos_today(), 13500, 243600, 0, 4900, 40550, '[{"ref":"A1","amount":1500},{"ref":"A2","amount":1800}]'::jsonb, $1, '{"cash":"c.jpg","transfer":"t.jpg","chowdeck":"d.jpg","app":"a.jpg"}'::jsonb)`, [U.cash], 'different person');
 await as('cash', `select submit_cash_eod(lagos_today(), 13500, 243600, 0, 4900, 40550, '[]'::jsonb, $1, '{"cash":"c.jpg"}'::jsonb)`, [U.bm], 'Chowdeck screenshot');
 await as('cash', `select submit_aronium_total(lagos_today(), 298550, 'ar.jpg')`, [], 'money received for this date first');
-await as('cash', `select submit_cash_eod(lagos_today(), 13500, 243600, 0, 4900, 40550, '[{"ref":"A1","amount":1500},{"ref":"A2","amount":1800}]'::jsonb, $1, '{"cash":"c.jpg","transfer":"t.jpg","chowdeck":"d.jpg","app":"a.jpg"}'::jsonb, null, '[{"ref":"A9","amount":2500,"reason":"wrong order"}]'::jsonb)`, [U.bm]);
+await as('cash', `select submit_cash_eod(lagos_today(), 13500, 243600, 0, 4900, 40550, '[{"ref":"A1","amount":1500,"method":"cash"},{"ref":"A2","amount":1800,"method":"transfer"}]'::jsonb, $1, '{"cash":"c.jpg","transfer":"t.jpg","chowdeck":"d.jpg","app":"a.jpg"}'::jsonb, null, '[{"ref":"A9","amount":2500,"reason":"wrong order"}]'::jsonb)`, [U.bm]);
 await as('cash', `select submit_cash_eod(lagos_today(), 1, 0, 0, 0, 0, '[]'::jsonb, $1, '{"cash":"c.jpg"}'::jsonb)`, [U.bm], 'already submitted');
 await as('cash', `select submit_aronium_total(lagos_today(), 298550, 'ar.jpg')`);
 await as('kl', `select submit_aronium_total(lagos_today(), 298550, 'ar.jpg')`, [], 'role cannot');
@@ -125,7 +129,7 @@ console.log('item changes logged:', ch.rows[0].c);
 await as('owner', `delete from items where id='flour'`, [], 'permission denied');
 // Menu: owner manages, staff can't see; price owner-only once set; measurements logged; never deleted
 const mc = await as('owner', 'select count(*)::int as c from menu_items');
-if (mc[0].c !== 45) { fail++; console.log('FAIL menu seed count', mc[0].c); } else n++;
+if (mc[0].c !== 47) { fail++; console.log('FAIL menu seed count', mc[0].c); } else n++;
 const ms = await as('cash', 'select count(*)::int as c from menu_items');
 if (ms[0].c !== 0) { fail++; console.log('FAIL cashier can read menu'); } else n++;
 await as('cook', `select save_menu_recipe('wrap-regular', '[{"code":"shawarma-bread","qty":1}]'::jsonb)`, [], 'role cannot');
@@ -155,6 +159,61 @@ await as('store', `select confirm_grn($1, '[{"code":"onions","qty":5}]'::jsonb, 
 const src = await db.query(`select type, source, paper_page from events where source='paper'`);
 console.log('paper entries:', src.rows.length);
 const st = await one('store', 'select store_status()');
+
+// ---- Aronium sync, name links, low stock ----
+const H = k => crypto.createHash('sha256').update(k).digest('hex');
+await as('cash', `select create_sync_device('tanke', 'Tanke laptop', $1)`, [H('k1')], 'role cannot');
+const dev = await one('owner', `select create_sync_device('tanke', 'Tanke laptop', $1)`, [H('k1')]);
+await as('owner', `select create_sync_device('store', 'x', $1)`, [H('k2')], 'Choose a branch');
+await as('cash', `select _aronium_ingest($1, 'heartbeat', '{}'::jsonb)`, [H('k1')], 'permission denied');
+const ingest = async (key, kind, body) => {
+  await db.exec('set role service_role');
+  try { const r = await db.query('select _aronium_ingest($1, $2, $3::jsonb) as r', [H(key), kind, JSON.stringify(body)]); return r.rows[0].r; }
+  catch (e) { return { error: e.message }; } finally { await db.exec('reset role'); }
+};
+const check = (cond, msg) => { if (cond) n++; else { fail++; console.log('FAIL ' + msg); } };
+await db.exec(`grant usage on schema public to service_role`);
+check((await ingest('nope', 'heartbeat', {})).error?.includes('unknown'), 'unknown key accepted');
+check((await ingest('k1', 'heartbeat', { status: { version: '1.0' } })).ok, 'heartbeat');
+const today = (await db.query(`select lagos_today()::text d`)).rows[0].d;
+const zr = { zId: 2, zNumber: 2, closedAt: `${today} 23:40:00`, fromDoc: 1, toDoc: 56, docCount: 54, missingDocs: 2,
+  payments: [{ name: 'Cash', amount: 113100 }, { name: 'Card', amount: 228900 }, { name: 'Transfer', amount: 5200 }, { name: 'APP', amount: 238400 }, { name: 'CHOWDECK', amount: 36800 }],
+  salesTotal: 622400, salesCount: 54, refundTotal: 0, refundCount: 0, items: [{ name: 'Chicken Wrap ', qty: 3, total: 10500 }] };
+const z1 = await ingest('k1', 'zreport', { report: zr });
+check(z1.ok && z1.businessDate === today, 'zreport stored ' + JSON.stringify(z1));
+check((await ingest('k1', 'zreport', { report: zr })).duplicate, 'zreport resend is a duplicate');
+check((await ingest('k1', 'zreport', { report: { ...zr, payments: [{ name: 'Cash', amount: 1 }] } })).conflict, 'changed resend flagged');
+check((await ingest('k1', 'zreport', { report: { ...zr, zId: 3, zNumber: 3, closedAt: `${today} 02:10:00` } })).businessDate < today, 'after-midnight close counts as previous day');
+const zev = (await db.query(`select data from events where type='ARONIUM_ZREPORT' and data->>'zId'='2'`)).rows[0].data;
+check(zev.payments.app === 238400 && zev.payments.chowdeck === 36800 && zev.total === 622400, 'payments mapped ' + JSON.stringify(zev.payments));
+check((await db.query(`select count(*)::int c from events where type='SYNC_ALERT'`)).rows[0].c === 1, 'one sync alert');
+check((await ingest('k1', 'products', { products: [{ name: 'Chicken Wrap ', price: 3500, group: 'Wraps' }, { name: 'chicken  wrap', price: 3500 }] })).products === 2, 'products');
+check((await db.query(`select count(*)::int c from aronium_products`)).rows[0].c === 1, 'product names normalised');
+const sub = await one('cash', 'select my_submissions()');
+check(sub.aroniumAuto && sub.aroniumTotal, 'cashier sees auto sync ' + JSON.stringify(sub));
+check(!JSON.stringify(sub).includes('622400'), 'cashier never sees Aronium figures');
+await as('cash', `select submit_aronium_total(lagos_today() - 1, 1, 'ar.jpg')`, [], 'automatically');
+await as('cash', `select count(*) from sync_devices`, [], null).then(r => check(r && r[0].count == 0, 'cashier cannot see devices'));
+await as('owner', `select set_sync_device_active($1, false)`, [dev]);
+check((await ingest('k1', 'heartbeat', {})).error?.includes('revoked'), 'revoked laptop refused');
+// Aronium name links
+await as('cash', `select link_aronium_name('Chicken Wrap', 'wrap-regular')`, [], 'role cannot');
+await as('owner', `select link_aronium_name('Chicken Wrap ', 'wrap-regular')`);
+await as('owner', `select link_aronium_name('chicken   wrap', 'wrap-large')`);
+const al = await as('owner', `select menu_item_id from menu_aliases`);
+check(al.length === 1 && al[0].menu_item_id === 'wrap-large', 'alias moved');
+await as('owner', `select link_aronium_name('Chicken wrap', null)`);
+check((await as('owner', `select count(*)::int c from menu_aliases`))[0].c === 0, 'alias unlinked');
+check((await as('owner', `select count(*)::int c from menu_changes where field like 'Aronium%'`))[0].c === 4, 'alias changes logged');
+// Low stock: chicken counted 13 by owner (independent), reorder 15 → low; onions 5, reorder 3 → fine
+await db.exec(`update items set reorder_level = 15 where id = 'chicken'; update items set reorder_level = 3 where id = 'onions';`);
+const bal = (await db.query(`select item_id, qty from _store_balance() where item_id in ('chicken','onions','garlic-sauce') order by 1`)).rows;
+check(bal[0].qty == 13 && bal[1].qty == 3 && bal[2].qty == 5, 'store balance ' + JSON.stringify(bal));
+const low = await one('buyer', 'select low_stock()');
+check(low.length === 1 && low[0].code === 'chicken' && !('qty' in low[0]), 'low stock list ' + JSON.stringify(low));
+await as('cash', 'select low_stock()', [], 'role cannot');
+await as('store', 'select low_stock()', [], 'role cannot');
+await as('buyer', 'select _store_balance()', [], 'permission denied');
 console.log(`\n${n} checks passed, ${fail} failed`);
 const dump = (await db.query(`select seq, type, occurred_at, recorded_at, actor_id, actor_name, actor_role, location_id, source, paper_page, data from events order by seq`)).rows;
 fs.writeFileSync('./events.json', JSON.stringify(dump, null, 1));

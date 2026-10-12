@@ -8,12 +8,12 @@ import { PGlite } from '@electric-sql/pglite';
 const DIST = '../../dist';
 const db = new PGlite();
 await db.exec(`
-create role anon; create role authenticated;
+create role anon; create role authenticated; create role service_role;
 create schema auth;
 create table auth.users (id uuid primary key);
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 grant usage on schema auth to authenticated, anon; grant execute on function auth.uid() to authenticated, anon;
-grant usage on schema public to authenticated, anon;
+grant usage on schema public to authenticated, anon, service_role;
 alter default privileges in schema public grant all on tables to anon, authenticated;
 alter default privileges in schema public grant all on sequences to anon, authenticated;`);
 await db.exec(fs.readFileSync('../../supabase/setup.sql', 'utf8'));
@@ -21,12 +21,17 @@ await db.exec(fs.readFileSync('../../supabase/setup.sql', 'utf8'));
 const users = {};          // email -> {id, pin}
 const tokens = {};         // token -> id
 const banned = new Set();
+// The server functions' service key (api/aronium.js calls in with it).
+process.env.SUPABASE_URL = 'http://localhost:5174';
+process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key';
+tokens['service-key'] = 'service';
 let q = Promise.resolve();
 const serial = fn => (q = q.then(fn, fn));
 
 async function asUser(uid, fn) {
   return serial(async () => {
-    await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${uid || ''}', false); set role ${uid ? 'authenticated' : 'anon'};`);
+    const svc = uid === 'service';
+    await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${svc ? '' : uid || ''}', false); set role ${svc ? 'service_role' : uid ? 'authenticated' : 'anon'};`);
     try { return await fn(); } finally { await db.exec('reset role'); }
   });
 }
@@ -164,6 +169,14 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, { ok: true });
       }
       if (body.action === 'reset_pin') { const e = Object.values(users).find(x => x.id === body.userId); e.pin = String(body.pin); return send(res, 200, { ok: true }); }
+    }
+
+    // ---- /api/aronium: the real Vercel function, adapted ----
+    if (u.pathname === '/api/aronium') {
+      const { default: handler } = await import('../../api/aronium.js');
+      const out = { code: 200 };
+      const vres = { status(c) { out.code = c; return vres; }, json(b) { send(res, out.code, b); } };
+      return handler({ method: req.method, headers: req.headers, body: raw }, vres);
     }
 
     // ---- static ----

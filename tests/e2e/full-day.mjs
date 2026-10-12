@@ -7,7 +7,7 @@ async function user(name) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await ctx.newPage();
   page.on('pageerror', e => errors.push(`[${name}] ${e.message}`));
-  page.on('console', m => { if (m.type() === 'error') errors.push(`[${name}] console: ${m.text()}`); });
+  page.on('console', m => { if (m.type() === 'error' && !/ERR_TUNNEL_CONNECTION_FAILED/.test(m.text())) errors.push(`[${name}] console: ${m.text()}`); });
   await page.goto(B);
   return page;
 }
@@ -59,6 +59,7 @@ await btn(owner, 'Items').click();
 for (const [id, price, unit] of [['chicken', 4500, 'kg'], ['shawarma-bread', 300, 'pcs']]) {
   const row = owner.locator(`tr[data-item="${id}"]`);
   await row.locator('[data-f=cost_price]').fill(String(price)); await row.locator('[data-f=count_unit]').fill(unit);
+  if (id === 'chicken') await row.locator('[data-f=reorder_level]').fill('12');
   await row.locator('button', { hasText: 'Save' }).click(); await expectToast(owner, /Item saved/, 'price ' + id);
 }
 await btn(owner, 'Branches').click(); await owner.fill('#loc-adeta', 'Adeta branch'); await owner.locator('button[data-id=adeta]').click(); await expectToast(owner, /Saved/, 'save Adeta branch name');
@@ -80,6 +81,8 @@ await btn(store, 'Confirm goods received').click(); await expectToast(store, /Op
 await store.fill('#op-reason', 'Morning delivery'); await store.fill('#op-present', 'Tunde');
 await btn(store, 'Open store').click(); await expectToast(store, /Store opened/, 'open store');
 await fillLines(store, grnBox, [{ qty: 18 }, { qty: 100 }, { qty: 10 }]);
+await btn(store, 'Confirm goods received').click(); await expectToast(store, /photo of the goods/, 'GRN needs photo');
+await store.setInputFiles('#grn-ph-' + grnBox.slice(4), 'photo.jpg');
 await btn(store, 'Confirm goods received').click(); await expectToast(store, /received/, 'GRN confirmed');
 // write-off with witness + photo
 await store.click('summary:has-text("Write off")');
@@ -97,7 +100,14 @@ await btn(bm, 'Send request').click(); await expectToast(bm, /Request REQ-/, 'br
 await store.reload(); await store.waitForSelector('header');
 const relBox = await store.locator('[id^=rel-REQ]').first().getAttribute('id');
 await store.selectOption(`#rel-drv-${relBox.slice(4)}`, { label: 'Yusuf Driver' });
+await btn(store, 'Release stock').click(); await expectToast(store, /photo of the stock/, 'release needs photo');
+await store.setInputFiles('#rel-ph-' + relBox.slice(4), 'photo.jpg');
 await btn(store, 'Release stock').click(); await expectToast(store, /Released as MOV-/, 'release to driver');
+// procurement officer sees chicken low (18 in, 8 out = 10, reorder at 12), without quantities
+await buyer.reload(); await buyer.waitForSelector('header');
+const lowTxt = await buyer.locator('.card.low').textContent().catch(() => '');
+console.log((/Chicken/.test(lowTxt) && !/\b10\b/.test(lowTxt) ? 'ok  ' : 'FAIL') + ' buyer sees low stock without the balance: ' + lowTxt.replace(/\s+/g, ' ').slice(0, 160));
+if (!/Chicken/.test(lowTxt)) errors.push('low stock not shown to buyer');
 const drv = await user('driver'); await login(drv, 'yusuf', '222222');
 const runsTxt = await drv.textContent('main'); console.log((/On the road/.test(runsTxt) ? 'ok  ' : 'FAIL') + ' driver sees run on the road');
 await bm.reload(); await bm.waitForSelector('header');
@@ -114,6 +124,8 @@ const cook = await user('cook'); await login(cook, 'aisha', '222222');
 await fillLines(cook, 'kr-lines', [{ code: 'garlic-powder', qty: 1 }]);
 await btn(cook, 'Send request').click(); await expectToast(cook, /Request REQ-/, 'kitchen request');
 await store.reload(); await store.waitForSelector('header');
+const kBox = await store.locator('[id^=rel-REQ]').first().getAttribute('id');
+await store.setInputFiles('#rel-ph-' + kBox.slice(4), 'photo.jpg');
 await btn(store, 'Release stock').click(); await expectToast(store, /Released as MOV-/, 'release to kitchen');
 await cook.reload(); await cook.waitForSelector('header');
 const yo = await cook.locator('[id^=yo-MOV]').first().getAttribute('id');
@@ -141,6 +153,8 @@ await cash.selectOption('#ce-witness', { label: 'Bola Manager' });
 await btn(cash, 'Add delivery').click(); await btn(cash, 'Add delivery').click();
 await cash.locator('.fee-ref').nth(0).fill('A101'); await cash.locator('.fee-amt').nth(0).fill('1500');
 await cash.locator('.fee-ref').nth(1).fill('A102'); await cash.locator('.fee-amt').nth(1).fill('1800');
+await btn(cash, 'Submit money received').click(); await expectToast(cash, /how each delivery fee was paid|photo of the counted cash/, 'fee needs payment type (or cash photo first)');
+await cash.locator('.fee-how').nth(0).selectOption('cash'); await cash.locator('.fee-how').nth(1).selectOption('transfer');
 await btn(cash, 'Add refund').click();
 await cash.locator('.rf-ref').nth(0).fill('A099'); await cash.locator('.rf-amt').nth(0).fill('2500'); await cash.locator('.rf-why').nth(0).fill('Wrong order sent');
 await cash.fill('#ce-note', 'POS network was down for an hour');
@@ -165,7 +179,7 @@ await btn(adm, 'Submit count').click(); await expectToast(adm, /Count saved/, 'a
 // --- owner: menu ---
 await owner.reload(); await owner.waitForSelector('header');
 await btn(owner, 'Settings').click(); await owner.waitForSelector('.menu-row');
-const menuRows = await owner.locator('.menu-row').count(); console.log((menuRows === 45 ? 'ok  ' : 'FAIL') + ' menu shows 45 items: ' + menuRows);
+const menuRows = await owner.locator('.menu-row').count(); console.log((menuRows === 47 ? 'ok  ' : 'FAIL') + ' menu shows 47 items: ' + menuRows);
 const wrap = owner.locator('.menu-row[data-menu="wrap-regular"]');
 await wrap.locator('summary').click();
 await fillLines(owner, 'mr-wrap-regular', [{ code: 'shawarma-bread', qty: 1 }, { code: 'chicken', qty: 0.12 }]);
@@ -177,6 +191,34 @@ await btn(owner, 'Add to menu').click(); await expectToast(owner, /Added to the 
 const sumTxt = await owner.locator('.menu-row[data-menu="wrap-regular"] summary').textContent(); console.log((/2 items/.test(sumTxt) ? 'ok  ' : 'FAIL') + ' measurements count shown: ' + sumTxt.trim());
 await owner.screenshot({ path: 'shot-menu.png', fullPage: false });
 
+// --- owner adds the Tanke laptop; the laptop sends tonight's Aronium report ---
+await btn(owner, 'Aronium sync').click();
+await owner.fill('#nd-name', 'Tanke counter laptop'); await owner.selectOption('#nd-branch', 'tanke');
+await btn(owner, 'Create key').click(); await expectToast(owner, /Key created/, 'laptop key created');
+const devKey = (await owner.textContent('.keybox')).trim();
+await owner.screenshot({ path: 'shot-sync.png', fullPage: true });
+await btn(owner, 'Done').click();
+if (await owner.locator('.keybox').count()) errors.push('key still shown after Done'); else console.log('ok   key hidden after Done');
+const lagos = new Date(Date.now() + 3600e3).toISOString().slice(0, 10);
+const post = (key, body) => fetch(B + '/api/aronium', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + key }, body: JSON.stringify(body) }).then(async r => ({ code: r.status, body: await r.json() }));
+const zrep = { zId: 7, zNumber: 5, closedAt: `${lagos} 22:30:00`, fromDoc: 100, toDoc: 140, docCount: 40, missingDocs: 1, salesCount: 39, salesTotal: 299950, refundTotal: 0, refundCount: 0,
+  payments: [{ name: 'Cash', amount: 12700 }, { name: 'Transfer', amount: 241800 }, { name: 'CHOWDECK', amount: 4900 }, { name: 'APP', amount: 40550 }],
+  items: [{ name: 'chicken wrap regular ', qty: 5, total: 17500 }, { name: 'Beiroot Bomb', qty: 2, total: 9800 }] };
+let r1 = await post('wrong-key-wrong-key-wrong', { kind: 'heartbeat' }); console.log((r1.code === 403 ? 'ok  ' : 'FAIL') + ' unknown laptop key refused');
+r1 = await post(devKey, { kind: 'zreport', report: zrep }); console.log((r1.body.ok ? 'ok  ' : 'FAIL') + ' Z report accepted: ' + JSON.stringify(r1.body));
+r1 = await post(devKey, { kind: 'products', products: [{ name: 'Beiroot Bomb', price: 4900, group: 'Subs' }, { name: 'Chicken Wrap Regular', price: 3500 }] });
+r1 = await post(devKey, { kind: 'heartbeat', status: { version: '1.0.0', computer: 'TANKE-PC' } });
+// cashier at a synced branch has no Aronium step and still sees no figures
+await cash.reload(); await cash.waitForSelector('main .done');
+const cashAuto = await cash.textContent('main');
+console.log((/sent to the owner automatically/.test(cashAuto) && !/12,700|299,950/.test(cashAuto) ? 'ok  ' : 'FAIL') + ' cashier: automatic, no figures');
+// owner links the unlinked Aronium name
+await owner.reload(); await owner.waitForSelector('header'); await btn(owner, 'Settings').click(); await owner.waitForSelector('.menu-row');
+const unl = await owner.locator('.unlinked').textContent(); console.log((/Beiroot Bomb/.test(unl) && !/Chicken Wrap Regular/i.test(unl) ? 'ok  ' : 'FAIL') + ' unlinked list: ' + unl.replace(/\s+/g, ' ').slice(0, 120));
+await owner.locator('select[data-alias="Beiroot Bomb"]').selectOption('sub-bomb-regular');
+await owner.locator('button[data-act=linkAlias][data-name="Beiroot Bomb"]').click(); await expectToast(owner, /Linked/, 'link Aronium name');
+const aliasTxt = await owner.locator('.menu-row[data-menu="sub-bomb-regular"]').textContent(); console.log((/Beiroot Bomb/.test(aliasTxt) ? 'ok  ' : 'FAIL') + ' alias shown on the menu item');
+
 // --- owner reviews ---
 await owner.reload(); await owner.waitForSelector('header');
 await btn(owner, 'Today').click(); await owner.waitForSelector('.headline');
@@ -184,11 +226,15 @@ const today = await owner.textContent('main');
 console.log('owner today:', today.replace(/\s+/g, ' ').slice(0, 400));
 await btn(owner, 'Alerts').click(); await owner.waitForTimeout(300);
 const al = await owner.locator('.alerts li b').allTextContents(); console.log('alerts:', al);
+console.log((al.some(a => /Receipts missing in Aronium/.test(a)) ? 'ok  ' : 'FAIL') + ' missing-receipt alert');
 await btn(owner, 'Reports').click(); await owner.waitForSelector('.recon, .card');
-const money = await owner.locator('.recon').first().textContent(); console.log('money:', money.replace(/\s+/g, ' ').slice(0, 300));
+const money = await owner.locator('.recon').first().textContent(); console.log('money:', money.replace(/\s+/g, ' ').slice(0, 900));
+console.log((/By payment type/.test(money) && /receipt number missing/.test(money) && /−₦700|-₦700/.test(money) ? 'ok  ' : 'FAIL') + ' money report: per type, missing receipt, short ₦700');
 await owner.screenshot({ path: 'shot-money.png', fullPage: true });
 await btn(owner, 'Kitchen end of day').click(); await owner.waitForTimeout(300);
-console.log('kitchen:', (await owner.textContent('main')).replace(/\s+/g, ' ').slice(0, 400));
+const kt = (await owner.textContent('main')).replace(/\s+/g, ' ');
+console.log('kitchen:', kt.slice(0, 700));
+console.log((/9 more used than sold/.test(kt) ? 'ok  ' : 'FAIL') + ' kitchen: bread 14 used vs 5 sold flagged');
 await owner.screenshot({ path: 'shot-kitchen.png', fullPage: true });
 await btn(owner, 'Daily stock').click(); await owner.waitForTimeout(300);
 console.log('stock:', (await owner.textContent('main')).replace(/\s+/g, ' ').slice(0, 500));

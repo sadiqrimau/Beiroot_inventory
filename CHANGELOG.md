@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0 (2026-10-12)
+
+- **Aronium sync**: `sync/` program for the branch laptops and `api/aronium.js`. The Z report arrives automatically when the register is closed. Settings → **Aronium sync** to add or revoke laptops; Today shows each laptop's last contact.
+- Money report checks each payment type against Aronium; missing receipt numbers flagged. Cashier at a synced branch has no Aronium step. Delivery fees record how they were paid.
+- Kitchen report fills "Sold (Aronium)" with Reconciled / discrepancy per item; lists Aronium items not linked or without measurements.
+- Settings → Menu: link Aronium item names to menu items (one menu for all branches). Crispy meal and Extra fries added (no price yet).
+- Storekeeper: photo required at goods received, releases and emergency releases.
+- Procurement officer: low-stock list (names and reorder levels only). Owner gets a `LOW_STOCK` alert.
+- Fix: switching tabs while a slow tab was loading could show the wrong screen.
+- Database: `sync_devices`, `aronium_products`, `menu_aliases`, `norm_name`, `create_sync_device`, `set_sync_device_active`, `link_aronium_name`, `_aronium_ingest`, `_store_balance`, `low_stock`; photo argument on `confirm_grn`, `release_stock`, `emergency_release`.
+
 ## 0.3.0 (2026-10-12)
 
 - Settings → **Menu**: 45 menu items from the current posters (loaded fries split into Irish and sweet potato; slush cup ₦2,000), with price, size, Aronium name, on/off, and **measurements** per item. Change log covers menu items too.

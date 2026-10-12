@@ -88,11 +88,23 @@ export async function loadOwnerData() {
     }
     return rows;
   };
-  const [events, items, locations, settings, profiles, menu, recipes] = await Promise.all([
+  const [events, items, locations, settings, profiles, menu, recipes, aliases, products, devices] = await Promise.all([
     page('events', 'seq'), page('items', 'name'), page('locations', 'id'), page('settings', 'key'), page('profiles', 'full_name'),
     page('menu_items', 'sort'), page('menu_recipe_lines', 'menu_item_id'),
+    page('menu_aliases', 'norm'), page('aronium_products', 'name'), page('sync_devices', 'created_at'),
   ]);
-  return { events, items, locations, settings, profiles, menu, recipes };
+  return { events, items, locations, settings, profiles, menu, recipes, aliases, products, devices };
+}
+
+// Aronium item names are matched ignoring case and extra spaces (same as norm_name() in the database).
+export const normName = t => String(t || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+// Laptop keys for Aronium sync: made in this browser, shown once; only the hash is stored.
+export async function newDeviceKey() {
+  const b = crypto.getRandomValues(new Uint8Array(32));
+  const key = btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key));
+  return { key, hash: [...new Uint8Array(h)].map(x => x.toString(16).padStart(2, '0')).join('') };
 }
 
 export const toEngineEvent = r => ({

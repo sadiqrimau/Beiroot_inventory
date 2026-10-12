@@ -4,3 +4,4 @@ dist
 .env.local
 .vercel
 tests/e2e/events.json
+tests/e2e/shot-*.png

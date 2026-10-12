@@ -70,8 +70,11 @@ async function render(reload) {
   if (reload || !(S.tab in S.data)) {
     if (!app().querySelector('main')) app().innerHTML = shell('<p class="loading">Loading…</p>');
     else { app().querySelector('main').innerHTML = '<p class="loading">Loading…</p>'; }
-    try { S.data[S.tab] = await tab.load(S); }
-    catch (e) { app().innerHTML = shell(`<section><p class="err">${esc(e.message)}</p><button data-act-global="retry">Try again</button></section>`); return; }
+    let loaded;
+    try { loaded = await tab.load(S); }
+    catch (e) { if (S.tab !== tab.id) return; app().innerHTML = shell(`<section><p class="err">${esc(e.message)}</p><button data-act-global="retry">Try again</button></section>`); return; }
+    if (S.tab !== tab.id) return;   // the user moved to another tab while this one was loading
+    S.data[tab.id] = loaded;
   }
   const y = window.scrollY;
   app().innerHTML = shell(tab.view(S, S.data[S.tab]));
@@ -98,6 +101,7 @@ document.addEventListener('click', async ev => {
   const b = ev.target.closest('button'); if (!b) return;
   if (b.dataset.actGlobal === 'signout') { await signOut(); S.me = null; S.data = {}; invalidate(); return viewLogin(); }
   if (b.dataset.actGlobal === 'retry') return render(true);
+  if (b.dataset.tab || b.dataset.set === 'setTab') S.newKey = null;   // a laptop key is shown once only
   if (b.dataset.tab) { S.tab = b.dataset.tab; window.scrollTo(0, 0); return render(true); }
   if (b.dataset.set) { S[b.dataset.set] = b.dataset.value; return render(false); }
   if (b.dataset.act === 'photo') return openPhoto(b.dataset.path);

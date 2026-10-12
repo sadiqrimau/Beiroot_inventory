@@ -62,13 +62,13 @@ Staff can add the site to their phone's home screen (browser menu → *Add to Ho
 | Role | Screens |
 | --- | --- |
 | Owner / admin | Today, Alerts, Reports, Stock, Ledger, Settings, Blind count |
-| Storekeeper | Store: open/close, receive purchases (blind), release requests, emergency release, write-off |
-| Procurement officer | Purchases: log purchases with invoice photo |
+| Storekeeper | Store: open/close, receive purchases (blind, photo), release requests (photo), emergency release (photo), write-off |
+| Procurement officer | Purchases: low-stock list (names only), log purchases with invoice photo |
 | Driver | My runs (read-only) |
 | Central kitchen cook | Kitchen: request ingredients, report yield, write-off |
-| Branch manager | Branch: receive deliveries (blind, photo), request stock, Aronium total, write-off |
+| Branch manager | Branch: receive deliveries (blind, photo), request stock, write-off |
 | Kitchen lead | Tonight's count, and nothing else |
-| Cashier | Money end of day, and nothing else |
+| Cashier | Money end of day (plus Aronium's total only where the branch laptop isn't set up), and nothing else |
 | Counter | Blind count |
 
 A person can hold several roles. The rules are checked per person in the database, e.g. nobody can receive a delivery they carried.
@@ -77,10 +77,10 @@ A person can hold several roles. The rules are checked per person in the databas
 
 ## What's in Phase 1 (live now) and what comes next
 
-**Live:** staff logins, every stock flow, write-offs with date/time/location/witness/photo, blind counts, paper-book entries, corrections, all alerts, money end of day (owner's format), kitchen end of day (used per item), daily stock, operations report, CSV downloads, item and staff settings.
+**Live:** Aronium end-of-day reports sent automatically by the branch laptops (see [`sync/README.md`](sync/README.md)), staff logins, every stock flow, write-offs with date/time/location/witness/photo, blind counts, paper-book entries, corrections, all alerts, money end of day (owner's format), kitchen end of day (used per item), daily stock, operations report, CSV downloads, item and staff settings.
 
 **Next (needs information from the owner):**
-1. Menu measurements → Aronium sales import → kitchen "Reconciled / Discrepancy" per item.
+1. Menu measurements for every item (the Aronium import and kitchen "Reconciled / Discrepancy" are built; they fill in as measurements are added).
 2. Moniepoint webhook → transfer and card filled automatically.
 3. Central kitchen recipes → low-yield alerts.
 4. Insights page (simulator + review).
