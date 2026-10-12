@@ -1267,3 +1267,6 @@ begin
     execute 'grant execute on function public._aronium_ingest(text, text, jsonb) to service_role';
   end if;
 end $$;
+
+-- Tell the API to pick up the new tables and functions straight away.
+notify pgrst, 'reload schema';

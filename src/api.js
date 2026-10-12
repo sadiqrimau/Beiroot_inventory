@@ -88,10 +88,12 @@ export async function loadOwnerData() {
     }
     return rows;
   };
+  const optional = p => p.catch(e => { console.warn('Run the latest supabase/setup.sql:', e.message); return []; });
   const [events, items, locations, settings, profiles, menu, recipes, aliases, products, devices] = await Promise.all([
     page('events', 'seq'), page('items', 'name'), page('locations', 'id'), page('settings', 'key'), page('profiles', 'full_name'),
     page('menu_items', 'sort'), page('menu_recipe_lines', 'menu_item_id'),
-    page('menu_aliases', 'norm'), page('aronium_products', 'name'), page('sync_devices', 'created_at'),
+    // Newer tables: if the database update hasn't been run yet, carry on without them.
+    optional(page('menu_aliases', 'norm')), optional(page('aronium_products', 'name')), optional(page('sync_devices', 'created_at')),
   ]);
   return { events, items, locations, settings, profiles, menu, recipes, aliases, products, devices };
 }
