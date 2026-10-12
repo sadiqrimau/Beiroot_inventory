@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0 (2026-10-12)
+
+- Settings → **Menu**: 37 menu items from the current posters, with price, size, Aronium name, on/off, and **measurements** per item. Change log covers menu items too.
+- Database: `menu_items`, `menu_recipe_lines`, `menu_changes`, `save_menu_recipe`.
+
 ## 0.2.0 (2026-10-11)
 
 - Cashier end of day in two steps: (1) money received, locked; (2) Aronium total with photo. Branch manager no longer enters Aronium's total.

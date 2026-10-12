@@ -123,6 +123,26 @@ await as('owner', `update items set cost_price = 200 where id = 'flour'`);
 const ch = await db.query(`select count(*)::int c from item_changes where item_id='flour'`);
 console.log('item changes logged:', ch.rows[0].c);
 await as('owner', `delete from items where id='flour'`, [], 'permission denied');
+// Menu: owner manages, staff can't see; price owner-only once set; measurements logged; never deleted
+const mc = await as('owner', 'select count(*)::int as c from menu_items');
+if (mc[0].c !== 37) { fail++; console.log('FAIL menu seed count', mc[0].c); } else n++;
+const ms = await as('cash', 'select count(*)::int as c from menu_items');
+if (ms[0].c !== 0) { fail++; console.log('FAIL cashier can read menu'); } else n++;
+await as('cook', `select save_menu_recipe('wrap-regular', '[{"code":"shawarma-bread","qty":1}]'::jsonb)`, [], 'role cannot');
+await as('owner', `select save_menu_recipe('wrap-regular', '[{"code":"shawarma-bread","qty":1},{"code":"chicken","qty":0.12}]'::jsonb)`);
+await as('owner', `select save_menu_recipe('wrap-regular', '[{"code":"shawarma-bread","qty":1},{"code":"chicken","qty":0.15}]'::jsonb)`);
+const rl = await as('owner', `select count(*)::int as c from menu_recipe_lines where menu_item_id = 'wrap-regular'`);
+if (rl[0].c !== 2) { fail++; console.log('FAIL recipe lines', rl[0].c); } else n++;
+const mch = await as('owner', `select count(*)::int as c from menu_changes where menu_item_id = 'wrap-regular'`);
+if (mch[0].c !== 3) { fail++; console.log('FAIL menu change log', mch[0].c); } else n++;
+await as('owner', `select save_menu_recipe('wrap-regular', '[{"code":"nope","qty":1}]'::jsonb)`, [], 'Unknown stock item');
+await as('bm2', `update menu_items set price = 9999 where id = 'wrap-regular'`, [], 'Only the owner');
+await as('owner', `update menu_items set price = 3600 where id = 'wrap-regular'`);
+await as('owner', `delete from menu_items where id = 'wrap-regular'`, [], 'permission denied');
+await as('owner', `insert into menu_items(id, name, category, price) values ('drink-slush', 'Slush', 'Drinks', 1500)`);
+await as('cash', `insert into menu_items(id, name, category) values ('x', 'x', 'x')`, [], 'row-level security');
+await as('owner', `insert into menu_recipe_lines values ('wrap-large','chicken',1)`, [], 'permission denied');
+
 // Correction + paper entry
 const anyEv = (await db.query(`select id from events where type='RECEIPT'`)).rows[0].id;
 await as('owner', `select record_correction($1, 'Recount found the tray', 'tanke', '[{"code":"chicken","qty":1}]'::jsonb)`, [anyEv]);

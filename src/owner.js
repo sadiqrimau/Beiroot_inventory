@@ -247,7 +247,7 @@ const ledger = {
 };
 
 // ---------------- Settings ----------------
-const SETTINGS = [['items', 'Items'], ['staff', 'Staff'], ['branches', 'Branches'], ['rules', 'Alert rules'], ['changes', 'Change log']];
+const SETTINGS = [['menu', 'Menu'], ['items', 'Stock items'], ['staff', 'Staff'], ['branches', 'Branches'], ['rules', 'Alert rules'], ['changes', 'Change log']];
 const RULE_FIELDS = [['countTolerancePct', 'Count tolerance (% of book)'], ['countToleranceAbs', 'Count tolerance (units)'],
   ['countAlertValue', 'High-priority count gap (₦)'], ['countAlertQty', 'High-priority gap for unpriced items (units)'],
   ['transitHours', 'Delivery not received after (hours)'], ['yieldDueHours', 'Yield report due within (hours)'],
@@ -257,10 +257,41 @@ const settings = {
   id: 'settings', label: 'Settings', roles: ['owner', 'admin'],
   load: () => ownerData(),
   view(S, d) {
-    S.setTab = S.setTab || 'items';
+    S.setTab = S.setTab || 'menu';
     const ctx = d.ctx, raw = d.raw, isOwner = S.me.roles.includes('owner');
     let body = '';
-    if (S.setTab === 'items') {
+    if (S.setTab === 'menu') {
+      const menu = (raw.menu || []).slice().sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name));
+      const cats = [...new Set(menu.map(m => m.category))];
+      const rec = id => (raw.recipes || []).filter(r => r.menu_item_id === id).map(r => ({ code: r.item_id, qty: Number(r.qty) }));
+      const label = m => `${m.size ? m.size + ' ' : ''}${m.name}`;
+      const row = m => { const lines = rec(m.id);
+        return `<div class="menu-row ${m.active ? '' : 'off'}" data-menu="${esc(m.id)}">
+          <div class="menu-main">
+            <label>Name<input value="${esc(m.name)}" data-f="name"></label>
+            <label>Size<input value="${esc(m.size || '')}" data-f="size" placeholder="—"></label>
+            <label>Price ₦<input type="number" min="0" step="any" value="${m.price ?? ''}" data-f="price"></label>
+            <label>Name in Aronium<input value="${esc(m.aronium_name || '')}" data-f="aronium_name" placeholder="exactly as in Aronium"></label>
+            <label class="check"><input type="checkbox" data-f="active" ${m.active ? 'checked' : ''}> On the menu</label>
+            <button class="ghost" data-act="saveMenu" data-id="${esc(m.id)}">Save</button>
+          </div>
+          ${m.note ? `<small>${esc(m.note)}</small>` : ''}
+          <details ${S.openMenu === m.id ? 'open' : ''}><summary>Measurements ${lines.length ? `(${lines.length} items)` : '<span class="tag">not set</span>'}</summary>
+            <p class="lede">What one ${esc(label(m))} uses, in each item's count unit.</p>
+            ${lineEditor('mr-' + m.id, S.items, lines)}
+            <button class="primary" data-act="saveRecipe" data-id="${esc(m.id)}">Save measurements</button></details></div>`; };
+      const withRecipe = menu.filter(m => m.active && rec(m.id).length).length, activeN = menu.filter(m => m.active).length;
+      body = `<p class="lede">The restaurant's menu. Switch an item off when it's no longer sold; it's never deleted, so past reports stay right. ${isOwner ? '' : 'Only the owner can change a price once it is set.'}
+        Fill in <b>Name in Aronium</b> exactly as the item appears in Aronium, so sales can be matched later. Measurements set: <b>${withRecipe} of ${activeN}</b>.</p>
+        ${cats.map(c => `<h3 class="rep-h">${esc(c)}</h3>${menu.filter(m => m.category === c).map(row).join('')}`).join('') || '<p class="empty">No menu items yet.</p>'}
+        <datalist id="menucats">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+        <div class="card"><h3>Add a menu item</h3>
+          <label>Category<input id="nm-cat" list="menucats" placeholder="e.g. Chicken burgers"></label>
+          <label>Name<input id="nm-name"></label><label>Size <small>(optional)</small><input id="nm-size" placeholder="Regular, Large…"></label>
+          <label>Price ₦<input id="nm-price" type="number" min="0" step="any"></label>
+          <label>Name in Aronium<input id="nm-aron"></label>
+          <button class="primary" data-act="addMenu">Add to menu</button></div>`;
+    } else if (S.setTab === 'items') {
       const cats = [...new Set(raw.items.map(i => i.category))].sort();
       body = `<p class="lede">Prices and units can be set once the new suppliers are agreed. Until an item has a price, alerts use quantities. Items are switched off, never deleted. ${isOwner ? '' : 'Only the owner can change a price or unit once it is set.'}</p>
         <div class="scroll"><table class="items"><thead><tr><th>Item</th><th>Category</th><th>Count unit</th><th>Bought as</th><th class="n">Per bulk unit</th><th class="n">Cost ₦ / unit</th><th class="n">Reorder at</th><th>Count</th><th>Expiry</th><th>Active</th><th></th></tr></thead><tbody>
@@ -307,18 +338,49 @@ const settings = {
         ${RULE_FIELDS.map(([k, l]) => `<label>${esc(l)}<input type="number" step="any" id="rule-${k}" value="${ctx.rules[k] ?? ''}" ${isOwner ? '' : 'disabled'}></label>`).join('')}
         ${isOwner ? '<button class="primary" data-act="saveRules">Save rules</button>' : ''}`;
     } else {
-      body = `<p class="lede">Every change to an item, newest first.</p><div id="changes">Loading…</div>`;
+      body = `<p class="lede">Every change to a stock item or menu item, newest first.</p><div id="changes">Loading…</div>`;
       setTimeout(async () => {
-        const { data, error } = await sb.from('item_changes').select('*').order('id', { ascending: false }).limit(100);
+        const [a, m] = await Promise.all([sb.from('item_changes').select('*').order('id', { ascending: false }).limit(100),
+          sb.from('menu_changes').select('*').order('id', { ascending: false }).limit(100)]);
+        const error = a.error || m.error;
+        const menuName = id => { const x = (raw.menu || []).find(y => y.id === id); return x ? `${x.size ? x.size + ' ' : ''}${x.name} (menu)` : id; };
+        const data = error ? [] : a.data.concat((m.data || []).map(c => ({ ...c, item_id: null, _menu: menuName(c.menu_item_id) })))
+          .sort((x, y) => Date.parse(y.changed_at) - Date.parse(x.changed_at)).slice(0, 150);
         const el = $('#changes'); if (!el) return;
         const who = id => (raw.profiles.find(p => p.id === id) || {}).full_name || 'system';
-        el.innerHTML = error ? esc(cleanError(error)) : (data.length ? `<ol class="log">${data.map(c => `<li><time>${fmtT(c.changed_at)}</time><div><b>${esc(ctx.items[c.item_id]?.name || c.item_id)}</b>
+        el.innerHTML = error ? esc(cleanError(error)) : (data.length ? `<ol class="log">${data.map(c => `<li><time>${fmtT(c.changed_at)}</time><div><b>${esc(c._menu || ctx.items[c.item_id]?.name || c.item_id)}</b>
           <span>${esc(c.field)}: ${esc(c.old_value ?? '—')} → ${esc(c.new_value ?? '—')}</span><small>${esc(who(c.changed_by))}</small></div></li>`).join('')}</ol>` : '<p class="empty">No changes yet.</p>');
       }, 0);
     }
     return `<section><h2>Settings</h2><div class="seg">${SETTINGS.map(([k, l]) => `<button class="${k === S.setTab ? 'on' : ''}" data-set="setTab" data-value="${k}">${l}</button>`).join('')}</div>${body}</section>`;
   },
   act: {
+    async saveMenu(S, b) {
+      const row = document.querySelector(`.menu-row[data-menu="${CSS.escape(b.dataset.id)}"]`); const u = {};
+      row.querySelectorAll('.menu-main [data-f]').forEach(el => {
+        const f = el.dataset.f;
+        u[f] = el.type === 'checkbox' ? el.checked : el.type === 'number' ? (el.value === '' ? null : Number(el.value)) : (el.value.trim() || null);
+      });
+      need(u.name, 'The menu item needs a name.');
+      const { error } = await sb.from('menu_items').update(u).eq('id', b.dataset.id);
+      if (error) throw new Error(cleanError(error));
+      invalidate(); toast('Menu item saved.');
+    },
+    async saveRecipe(S, b) {
+      const id = b.dataset.id;
+      const lines = [...document.querySelectorAll(`#mr-${CSS.escape(id)} .line`)].map(r => ({ code: r.querySelector('select').value, qty: Number(r.querySelector('.qty').value) })).filter(l => l.code && l.qty);
+      await rpc('save_menu_recipe', { p_menu_item: id, p_lines: lines });
+      S.openMenu = id; invalidate(); toast('Measurements saved.');
+    },
+    async addMenu() {
+      const name = val('nm-name'); need(name, 'Give the menu item a name.'); need(val('nm-cat'), 'Give it a category.');
+      const size = val('nm-size');
+      const id = (val('nm-cat') + '-' + name + (size ? '-' + size : '')).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+      const { error } = await sb.from('menu_items').insert({ id, name, category: val('nm-cat'), size: size || null,
+        price: val('nm-price') === '' ? null : Number(val('nm-price')), aronium_name: val('nm-aron') || null, sort: 900 });
+      if (error) throw new Error(/duplicate/i.test(error.message) ? 'That menu item already exists.' : cleanError(error));
+      invalidate(); toast('Added to the menu.');
+    },
     async saveItem(S, b) {
       const row = document.querySelector(`tr[data-item="${CSS.escape(b.dataset.id)}"]`); const u = {};
       row.querySelectorAll('[data-f]').forEach(el => {

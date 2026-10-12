@@ -88,10 +88,11 @@ export async function loadOwnerData() {
     }
     return rows;
   };
-  const [events, items, locations, settings, profiles] = await Promise.all([
+  const [events, items, locations, settings, profiles, menu, recipes] = await Promise.all([
     page('events', 'seq'), page('items', 'name'), page('locations', 'id'), page('settings', 'key'), page('profiles', 'full_name'),
+    page('menu_items', 'sort'), page('menu_recipe_lines', 'menu_item_id'),
   ]);
-  return { events, items, locations, settings, profiles };
+  return { events, items, locations, settings, profiles, menu, recipes };
 }
 
 export const toEngineEvent = r => ({

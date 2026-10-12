@@ -853,3 +853,151 @@ insert into public.locations (id, name, kind) values ('adeta', 'Adeta branch', '
 update public.profiles set branch_id = 'adeta' where branch_id = 'branch2';
 delete from public.locations l where l.id = 'branch2'
   and not exists (select 1 from public.events e where e.location_id = 'branch2' or e.data->>'dest' = 'branch2' or e.data->>'branch' = 'branch2');
+
+-- ---------- Menu (owner manages) and measurements per menu item ---------------
+-- Safe to re-run. Menu items are switched off, never deleted, so past reports stay correct.
+
+create table if not exists public.menu_items (
+  id            text primary key,
+  name          text not null,
+  category      text not null,
+  size          text,
+  price         numeric check (price is null or price >= 0),   -- NGN
+  aronium_name  text,                                          -- exact name in Aronium, for matching sales later
+  note          text,
+  sort          int not null default 0,
+  active        boolean not null default true,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
+-- Measurements: how much of each stock item one portion of a menu item uses.
+create table if not exists public.menu_recipe_lines (
+  menu_item_id  text not null references public.menu_items(id),
+  item_id       text not null references public.items(id),
+  qty           numeric not null check (qty > 0),
+  primary key (menu_item_id, item_id)
+);
+
+create table if not exists public.menu_changes (
+  id            bigserial primary key,
+  menu_item_id  text not null,
+  changed_by    uuid,
+  changed_at    timestamptz not null default now(),
+  field         text not null,
+  old_value     text,
+  new_value     text
+);
+
+create or replace function public._menu_audit() returns trigger language plpgsql security definer
+set search_path = public, pg_temp as $$
+declare
+  f text; o jsonb := to_jsonb(old); n jsonb;
+  is_owner boolean := exists (select 1 from profiles where id = auth.uid() and 'owner' = any(roles) and active);
+begin
+  new.updated_at := now(); n := to_jsonb(new);
+  foreach f in array array['name','category','size','price','aronium_name','note','sort','active'] loop
+    if (o->>f) is distinct from (n->>f) then
+      if f = 'price' and (o->>f) is not null and not is_owner then
+        raise exception 'Only the owner can change a menu price once it is set.';
+      end if;
+      insert into menu_changes(menu_item_id, changed_by, field, old_value, new_value) values (old.id, auth.uid(), f, o->>f, n->>f);
+    end if;
+  end loop;
+  return new;
+end $$;
+drop trigger if exists menu_items_audit on public.menu_items;
+create trigger menu_items_audit before update on public.menu_items for each row execute function public._menu_audit();
+
+create or replace function public._menu_no_delete() returns trigger language plpgsql as $$
+begin raise exception 'Menu items are never deleted. Switch them off instead.'; end $$;
+drop trigger if exists menu_items_no_delete on public.menu_items;
+create trigger menu_items_no_delete before delete on public.menu_items for each row execute function public._menu_no_delete();
+
+-- Replace one menu item's measurements in one go, logging what changed.
+create or replace function public.save_menu_recipe(p_menu_item text, p_lines jsonb)
+returns void language plpgsql security definer set search_path = public, pg_temp as $$
+declare p profiles := _me(); l jsonb; newl jsonb := '{}'::jsonb; oldl jsonb; c text;
+begin
+  perform _need(p, 'owner', 'admin');
+  if not exists (select 1 from menu_items where id = p_menu_item) then raise exception 'Menu item not found.'; end if;
+  for l in select * from jsonb_array_elements(coalesce(p_lines, '[]'::jsonb)) loop
+    if not exists (select 1 from items where id = l->>'code') then raise exception 'Unknown stock item: %', l->>'code'; end if;
+    if coalesce((l->>'qty')::numeric, 0) <= 0 then raise exception 'Each measurement needs a quantity above 0.'; end if;
+    if newl ? (l->>'code') then raise exception 'A stock item is listed twice.'; end if;
+    newl := newl || jsonb_build_object(l->>'code', round((l->>'qty')::numeric, 4));
+  end loop;
+  select coalesce(jsonb_object_agg(item_id, qty), '{}'::jsonb) into oldl from menu_recipe_lines where menu_item_id = p_menu_item;
+  for c in select distinct k from (select jsonb_object_keys(oldl) k union select jsonb_object_keys(newl)) x loop
+    if (oldl->>c) is distinct from (newl->>c) then
+      insert into menu_changes(menu_item_id, changed_by, field, old_value, new_value)
+      values (p_menu_item, p.id, 'measurement: ' || (select name from items where id = c), oldl->>c, newl->>c);
+    end if;
+  end loop;
+  delete from menu_recipe_lines where menu_item_id = p_menu_item;
+  insert into menu_recipe_lines(menu_item_id, item_id, qty)
+    select p_menu_item, key, value::text::numeric from jsonb_each(newl);
+end $$;
+
+alter table public.menu_items        enable row level security;
+alter table public.menu_recipe_lines enable row level security;
+alter table public.menu_changes      enable row level security;
+drop policy if exists menu_read on public.menu_items;
+create policy menu_read on public.menu_items for select to authenticated using (is_reviewer());
+drop policy if exists menu_insert on public.menu_items;
+create policy menu_insert on public.menu_items for insert to authenticated with check (is_reviewer());
+drop policy if exists menu_update on public.menu_items;
+create policy menu_update on public.menu_items for update to authenticated using (is_reviewer()) with check (is_reviewer());
+drop policy if exists menu_recipe_read on public.menu_recipe_lines;
+create policy menu_recipe_read on public.menu_recipe_lines for select to authenticated using (is_reviewer());
+drop policy if exists menu_changes_read on public.menu_changes;
+create policy menu_changes_read on public.menu_changes for select to authenticated using (is_reviewer());
+revoke all on public.menu_items, public.menu_recipe_lines, public.menu_changes from anon;
+revoke delete on public.menu_items from authenticated;
+revoke insert, update, delete on public.menu_recipe_lines, public.menu_changes from authenticated;
+grant select, insert, update on public.menu_items to authenticated;
+grant select on public.menu_recipe_lines, public.menu_changes to authenticated;
+revoke all on function public.save_menu_recipe(text, jsonb) from public, anon;
+grant execute on function public.save_menu_recipe(text, jsonb) to authenticated;
+revoke all on function public._menu_audit() from public, anon, authenticated;
+
+-- The current menu (orange posters, October 2026). Aronium names to be confirmed.
+insert into public.menu_items (id, category, name, size, price, sort, note) values
+  ('wrap-regular',            'Chicken wraps',   'Chicken wrap',                              'Regular', 3500, 10, null),
+  ('wrap-large',              'Chicken wraps',   'Chicken wrap',                              'Large',   5500, 11, null),
+  ('sub-bomb-regular',        'Sub sandwiches',  'Beiroot Bomb (chicken + beef)',             'Regular', 4900, 20, null),
+  ('sub-bomb-large',          'Sub sandwiches',  'Beiroot Bomb (chicken + beef)',             'Large',   6900, 21, null),
+  ('sub-chicken-beef-regular','Sub sandwiches',  'Chicken or beef sub',                       'Regular', 3500, 22, null),
+  ('sub-chicken-beef-large',  'Sub sandwiches',  'Chicken or beef sub',                       'Large',   3900, 23, null),
+  ('sub-spicy-egg',           'Sub sandwiches',  'Beiroot sandwich (spicy egg)',              null,      2900, 24, null),
+  ('burger-single',           'Chicken burgers', 'Single',                                    null,      4200, 30, null),
+  ('burger-single-cheese',    'Chicken burgers', 'Single + cheese',                           null,      4900, 31, null),
+  ('burger-bigback',          'Chicken burgers', 'Bigback',                                   null,      5900, 32, null),
+  ('burger-bigback-cheese',   'Chicken burgers', 'Bigback + cheese',                          null,      6600, 33, null),
+  ('lf-mini-spicy-eggs',      'Loaded fries',    'Spicy eggs',                                'Mini',    3500, 40, 'Irish or sweet potato'),
+  ('lf-mini-chicken-beef',    'Loaded fries',    'Chicken / beef',                            'Mini',    3900, 41, 'Irish or sweet potato'),
+  ('lf-mini-fully-loaded',    'Loaded fries',    'Fully loaded (crispy chicken + shredded beef)', 'Mini', 5500, 42, 'Irish or sweet potato'),
+  ('lf-regular-chicken-beef', 'Loaded fries',    'Chicken or beef',                           'Regular', 4900, 43, 'Irish or sweet potato'),
+  ('lf-regular-fully-loaded', 'Loaded fries',    'Fully loaded (crispy chicken + shredded beef)', 'Regular', 6500, 44, 'Irish or sweet potato'),
+  ('lf-large-chicken-beef',   'Loaded fries',    'Chicken or beef',                           'Large',   5900, 45, 'Irish or sweet potato'),
+  ('lf-large-fully-loaded',   'Loaded fries',    'Fully loaded (crispy chicken + shredded beef)', 'Large', 7500, 46, 'Irish or sweet potato'),
+  ('side-tenders-regular',    'Sides',           'Chicken tenders',                           'Regular', 3900, 50, null),
+  ('side-tenders-large',      'Sides',           'Chicken tenders',                           'Large',   5900, 51, null),
+  ('side-fries-regular',      'Sides',           'Fries',                                     'Regular', 3400, 52, null),
+  ('side-fries-large',        'Sides',           'Fries',                                     'Large',   4900, 53, null),
+  ('topup-crispy-chicken',    'Top-ups',         'Crispy chicken',                            null,      1200, 60, null),
+  ('topup-shredded-chicken',  'Top-ups',         'Shredded chicken',                          null,      1200, 61, null),
+  ('topup-shredded-beef',     'Top-ups',         'Shredded beef',                             null,      1200, 62, null),
+  ('topup-spicy-eggs',        'Top-ups',         'Spicy eggs',                                null,       600, 63, null),
+  ('extra-cream',             'Extras',          'Extra cream',                               null,         0, 70, 'Free'),
+  ('extra-sausage',           'Extras',          'Sausage',                                   null,       350, 71, null),
+  ('extra-double-sausage',    'Extras',          'Double sausage',                            null,       700, 72, null),
+  ('extra-caramelized-onions','Extras',          'Caramelized onions',                        null,       600, 73, null),
+  ('extra-omelette',          'Extras',          'Omelette',                                  null,       500, 74, null),
+  ('extra-cheese-slice',      'Extras',          'Cheese slice',                              null,       800, 75, null),
+  ('extra-cheese-melt',       'Extras',          'Cheese melt',                               null,      1500, 76, null),
+  ('dip-garlic',              'Dips',            'Garlic',                                    null,       400, 80, null),
+  ('dip-pepper',              'Dips',            'Pepper',                                    null,       400, 81, null),
+  ('dip-ketchup',             'Dips',            'Ketchup',                                   null,       400, 82, null),
+  ('dip-thousand-island',     'Dips',            'Thousand island',                           null,       500, 83, null)
+on conflict (id) do nothing;
