@@ -2,7 +2,7 @@
 
 ## 0.3.0 (2026-10-12)
 
-- Settings → **Menu**: 37 menu items from the current posters, with price, size, Aronium name, on/off, and **measurements** per item. Change log covers menu items too.
+- Settings → **Menu**: 45 menu items from the current posters (loaded fries split into Irish and sweet potato; slush cup ₦2,000), with price, size, Aronium name, on/off, and **measurements** per item. Change log covers menu items too.
 - Database: `menu_items`, `menu_recipe_lines`, `menu_changes`, `save_menu_recipe`.
 
 ## 0.2.0 (2026-10-11)

@@ -165,14 +165,14 @@ await btn(adm, 'Submit count').click(); await expectToast(adm, /Count saved/, 'a
 // --- owner: menu ---
 await owner.reload(); await owner.waitForSelector('header');
 await btn(owner, 'Settings').click(); await owner.waitForSelector('.menu-row');
-const menuRows = await owner.locator('.menu-row').count(); console.log((menuRows === 37 ? 'ok  ' : 'FAIL') + ' menu shows 37 items: ' + menuRows);
+const menuRows = await owner.locator('.menu-row').count(); console.log((menuRows === 45 ? 'ok  ' : 'FAIL') + ' menu shows 45 items: ' + menuRows);
 const wrap = owner.locator('.menu-row[data-menu="wrap-regular"]');
 await wrap.locator('summary').click();
 await fillLines(owner, 'mr-wrap-regular', [{ code: 'shawarma-bread', qty: 1 }, { code: 'chicken', qty: 0.12 }]);
 await wrap.locator('button', { hasText: 'Save measurements' }).click(); await expectToast(owner, /Measurements saved/, 'menu measurements');
 await owner.locator('.menu-row[data-menu="wrap-regular"] [data-f=aronium_name]').fill('Chicken Wrap Regular');
 await owner.locator('.menu-row[data-menu="wrap-regular"] button', { hasText: 'Save' }).first().click(); await expectToast(owner, /Menu item saved/, 'menu aronium name');
-await owner.fill('#nm-cat', 'Drinks'); await owner.fill('#nm-name', 'Slush'); await owner.fill('#nm-price', '1500');
+await owner.fill('#nm-cat', 'Drinks'); await owner.fill('#nm-name', 'Water'); await owner.fill('#nm-price', '300');
 await btn(owner, 'Add to menu').click(); await expectToast(owner, /Added to the menu/, 'add menu item');
 const sumTxt = await owner.locator('.menu-row[data-menu="wrap-regular"] summary').textContent(); console.log((/2 items/.test(sumTxt) ? 'ok  ' : 'FAIL') + ' measurements count shown: ' + sumTxt.trim());
 await owner.screenshot({ path: 'shot-menu.png', fullPage: false });

@@ -5,12 +5,13 @@ The design decisions come from [`docs/BUILD_SPEC.md`](docs/BUILD_SPEC.md). This 
 ## 2026-10-12: Menu
 
 - The owner manages the menu in **Settings → Menu**: add items, edit name/size/price, switch off (never delete). Seeded with the **orange menu posters** (37 items).
-- A second, white "THE MENU" sheet has different prices and a few extra items (medium sub, spicy ₦200, separate sweet-potato loaded-fries prices). Treated as an older list until the owner confirms (open).
+- The orange posters are the menu. The white "THE MENU" sheet is not used; the owner handles any changes himself in Settings → Menu.
 - Each menu item has a **Name in Aronium** field. It must match Aronium exactly so sales can be matched to measurements later.
 - **Measurements** (stock used per portion) are attached per menu item and saved in one step through `save_menu_recipe`, which logs each change.
 - Once set, a menu price can only be changed by the owner. Every change is in the change log.
-- Loaded fries are one item per size and topping, noted "Irish or sweet potato". If Aronium records Irish and sweet separately, split them, because they use different stock (open).
-- No drinks are on the posters, but slush is on the kitchen sheet and slush cups are in stock (open).
+- Aronium records Irish and sweet loaded fries separately, so they are **separate menu items** (7 each, same prices), because they use different stock.
+- **Slush** is sold by the cup at ₦2,000 (Drinks).
+- 45 menu items in total.
 
 ## 2026-10-11: Money end of day: owner's answers
 
