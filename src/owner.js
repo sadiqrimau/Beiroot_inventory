@@ -313,8 +313,9 @@ const settings = {
       // Aronium names: linked through "Name in Aronium" or a link; the rest wait for the owner.
       const linkedTo = id => (raw.aliases || []).filter(a => a.menu_item_id === id);
       const seen = {};
-      (raw.products || []).forEach(p => { seen[p.norm] = seen[p.norm] || { name: p.name, enabled: p.enabled, branches: new Set() }; seen[p.norm].branches.add(p.branch_id); });
-      ctx.events.filter(e => e.type === 'ARONIUM_ZREPORT').forEach(z => (z.items || []).forEach(it => { const n = normName(it.name);
+      const liveDev = new Set(ctx.devices.filter(x => x.active).map(x => x.branch_id));
+      (raw.products || []).filter(p => liveDev.has(p.branch_id)).forEach(p => { seen[p.norm] = seen[p.norm] || { name: p.name, enabled: p.enabled, branches: new Set() }; seen[p.norm].branches.add(p.branch_id); });
+      ctx.events.filter(e => e.type === 'ARONIUM_ZREPORT' && liveDev.has(e.locationId) && e.ts > Date.now() - 30 * 864e5).forEach(z => (z.items || []).forEach(it => { const n = normName(it.name);
         seen[n] = seen[n] || { name: it.name.trim(), enabled: true, branches: new Set() }; seen[n].branches.add(z.locationId); seen[n].sold = true; }));
       const unlinked = Object.entries(seen).filter(([n]) => !ctx.menuByNorm[n]).sort((a, b) => (b[1].sold ? 1 : 0) - (a[1].sold ? 1 : 0) || a[1].name.localeCompare(b[1].name));
       const menuOpts = `<option value="">Link to menu item…</option>` + menu.filter(m => m.active).map(m => `<option value="${esc(m.id)}">${esc(m.category)}: ${esc(label(m))}</option>`).join('');

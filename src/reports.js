@@ -177,7 +177,8 @@ export function operations(ctx, date) {
 // ---------- What should have been submitted for a day ----------
 // A location counts as "live" once anything has been recorded for it, so a branch that
 // hasn't started using the system yet doesn't raise reminders every day.
-const liveSince = (ctx, loc) => { const e = ctx.events.find(x => x.locationId === loc || x.dest === loc || x.loc === loc); return e ? dayOf(e.ts) : null; };
+// Automatic Aronium reports don't count: a laptop can be set up before the staff start.
+const liveSince = (ctx, loc) => { const e = ctx.events.find(x => x.source !== 'import' && (x.locationId === loc || x.dest === loc || x.loc === loc)); return e ? dayOf(e.ts) : null; };
 export function missing(ctx, date) {
   const out = [];
   const [a, b] = dayRange(date);

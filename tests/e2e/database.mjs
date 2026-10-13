@@ -189,6 +189,9 @@ check(zev.payments.app === 238400 && zev.payments.chowdeck === 36800 && zev.tota
 check((await db.query(`select count(*)::int c from events where type='SYNC_ALERT'`)).rows[0].c === 1, 'one sync alert');
 check((await ingest('k1', 'products', { products: [{ name: 'Chicken Wrap ', price: 3500, group: 'Wraps' }, { name: 'chicken  wrap', price: 3500 }] })).products === 2, 'products');
 check((await db.query(`select count(*)::int c from aronium_products`)).rows[0].c === 1, 'product names normalised');
+check((await ingest('k1', 'products', { products: [{ name: 'Slush', price: 2000 }] })).products === 1, 'second product list');
+const pn = (await db.query(`select name from aronium_products`)).rows.map(r => r.name);
+check(pn.length === 1 && pn[0] === 'Slush', 'names no longer in Aronium are dropped ' + JSON.stringify(pn));
 const sub = await one('cash', 'select my_submissions()');
 check(sub.aroniumAuto && sub.aroniumTotal, 'cashier sees auto sync ' + JSON.stringify(sub));
 check(!JSON.stringify(sub).includes('622400'), 'cashier never sees Aronium figures');

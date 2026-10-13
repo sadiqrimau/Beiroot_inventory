@@ -1151,6 +1151,8 @@ begin
         enabled = excluded.enabled, last_seen_at = now();
       n := n + 1;
     end loop;
+    -- The laptop sends the full list: names no longer in it are dropped.
+    if n > 0 then delete from aronium_products where branch_id = dev.branch_id and last_seen_at < now(); end if;
     return json_build_object('ok', true, 'products', n);
 
   elsif p_kind = 'zreport' then
@@ -1248,6 +1250,10 @@ drop policy if exists menu_aliases_read on public.menu_aliases;
 create policy menu_aliases_read on public.menu_aliases for select to authenticated using (is_reviewer());
 revoke all on public.sync_devices, public.aronium_products, public.menu_aliases from anon, authenticated;
 grant select on public.sync_devices, public.aronium_products, public.menu_aliases to authenticated;
+
+-- Item names only count for branches whose laptop is active (clears names left by a test or a removed laptop).
+delete from public.aronium_products p
+  where not exists (select 1 from public.sync_devices d where d.branch_id = p.branch_id and d.active);
 
 -- Functions: signed-in users only; internal helpers not callable from the app (covers everything above).
 do $$
