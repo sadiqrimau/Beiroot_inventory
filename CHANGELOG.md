@@ -8,6 +8,7 @@
 - Settings → Menu: link Aronium item names to menu items (one menu for all branches). Crispy meal and Extra fries added (no price yet).
 - Storekeeper: photo required at goods received, releases and emergency releases.
 - Procurement officer: low-stock list (names and reorder levels only). Owner gets a `LOW_STOCK` alert.
+- Kitchen report download now includes the items Aronium sold (name, menu item, quantity, sales, link status), even before the kitchen count is in.
 - Fix: switching tabs while a slow tab was loading could show the wrong screen.
 - Database: `sync_devices`, `aronium_products`, `menu_aliases`, `norm_name`, `create_sync_device`, `set_sync_device_active`, `link_aronium_name`, `_aronium_ingest`, `_store_balance`, `low_stock`; photo argument on `confirm_grn`, `release_stock`, `emergency_release`.
 

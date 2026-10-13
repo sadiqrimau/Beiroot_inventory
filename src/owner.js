@@ -193,7 +193,22 @@ const reports = {
         downloadCsv(`money-eod-${day}.csv`, rows);
       } else if (S.repKind === 'kitchen') {
         const rows = [['Date', 'Branch', 'Item', 'Unit', 'Opening', 'Received', 'Counted', 'Used', 'Sold (Aronium)', 'Used minus sold', 'Status']];
-        ctx.branches.forEach(br => { const k = Rep.kitchen(ctx, d.R, br.id, day); (k.rows || []).forEach(r => rows.push([day, br.name, iname(ctx, r.code), iunit(ctx, r.code), r.opening, r.received, r.counted, r.used, r.sold, r.gap, r.status || ''])); });
+        ctx.branches.forEach(br => { const k = Rep.kitchen(ctx, d.R, br.id, day);
+          if (!k.submitted) rows.push([day, br.name, 'Kitchen count not submitted']);
+          (k.rows || []).forEach(r => rows.push([day, br.name, iname(ctx, r.code), iunit(ctx, r.code), r.opening, r.received, r.counted, r.used, r.sold, r.gap, r.status || ''])); });
+        // Second table: what Aronium sold that day, item by item.
+        rows.push([], ['Items sold (Aronium)'], ['Date', 'Branch', 'Aronium item', 'Menu item', 'Quantity sold', 'Sales (NGN)', 'Status']);
+        ctx.branches.forEach(br => {
+          const sold = {};
+          Rep.zReports(ctx, br.id, day).forEach(z => (z.items || []).forEach(it => {
+            const n = it.name.trim(), s = sold[n] = sold[n] || { qty: 0, total: 0 };
+            s.qty += Number(it.qty || 0); s.total += Number(it.total || 0); }));
+          Object.keys(sold).sort((a, b) => a.localeCompare(b)).forEach(n => {
+            const mid = ctx.menuByNorm[Rep.norm(n)];
+            const status = !mid ? 'Not linked to the menu' : (ctx.recipes[mid] || []).length ? 'Linked' : 'Linked, measurements not set';
+            rows.push([day, br.name, n, mid ? menuLabel(ctx, mid) : '', Math.round(sold[n].qty * 100) / 100, Math.round(sold[n].total), status]);
+          });
+        });
         downloadCsv(`kitchen-eod-${day}.csv`, rows);
       } else {
         const st = Rep.dailyStock(ctx, day);
