@@ -11,6 +11,7 @@
 - Kitchen report download now includes the items Aronium sold (name, menu item, quantity, sales, link status), even before the kitchen count is in.
 - A branch only starts getting "not submitted" reminders once staff record something there; automatic Aronium reports alone (or a test) no longer trigger them.
 - Aronium item names: only from branches with an active laptop, and names removed from Aronium drop off. Test names are cleared when setup.sql is run.
+- Sync installer: sends registers closed in the last 24 hours (installing the morning after no longer skips last night's close); no more Y/N question; re-installing keeps the laptop's key.
 - Fix: switching tabs while a slow tab was loading could show the wrong screen.
 - Database: `sync_devices`, `aronium_products`, `menu_aliases`, `norm_name`, `create_sync_device`, `set_sync_device_active`, `link_aronium_name`, `_aronium_ingest`, `_store_balance`, `low_stock`; photo argument on `confirm_grn`, `release_stock`, `emergency_release`.
 

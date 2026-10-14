@@ -13,8 +13,9 @@ Sends Aronium's end-of-day (Z) report to the Beiroot system as soon as the cashi
 1. On the website: **Settings → Aronium sync → Add a branch laptop**. Pick the branch, name the laptop, **Create key**, copy the key.
 2. Copy this `sync` folder to the laptop (USB or download).
 3. Sign in to Windows as the user who runs Aronium. Double-click **Install Beiroot Sync.cmd**.
-4. Press Enter for the website address, paste the key, answer **N** to "send the most recent closed register now" (answer **Y** only on a test laptop).
-5. It shows "Connected to Beiroot. Branch: …". Done.
+4. Press Enter for the website address and paste the key. (Installing again on the same laptop: press Enter to keep the key it already has.)
+5. Registers closed in the last 24 hours are sent straight away, so last night's close is not missed when installing the next morning. Older ones are not sent.
+6. It shows "Connected to Beiroot. Branch: …". Done.
 
 To check it later: **Check Beiroot Sync.cmd**. Log: `%LOCALAPPDATA%\BeirootSync\sync.log`. To remove: **Uninstall Beiroot Sync.cmd**. If a laptop is lost, revoke its key in Settings → Aronium sync.
 
@@ -23,7 +24,7 @@ To check it later: **Check Beiroot Sync.cmd**. Log: `%LOCALAPPDATA%\BeirootSync\
 | File | What it is |
 | --- | --- |
 | `beiroot-sync.ps1` | The program. Reads Aronium, sends to `/api/aronium`. |
-| `install.ps1` | Installer (called by `Install Beiroot Sync.cmd`). Finds Aronium, saves the key, starts after the newest closed register, registers the task. |
+| `install.ps1` | Installer (called by `Install Beiroot Sync.cmd`). Finds Aronium, saves the key, sends registers closed in the last 24 hours, registers the task. |
 | `run-hidden.vbs` | Starts the program without a window flashing. |
 | `*.cmd` | Double-click helpers: install, check, uninstall. |
 

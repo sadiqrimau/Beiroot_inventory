@@ -38,6 +38,13 @@ if (-not $ApiUrl) {
   $ApiUrl = Read-Host 'Website address (press Enter for https://beiroot-inventory.vercel.app)'
   if (-not $ApiUrl) { $ApiUrl = 'https://beiroot-inventory.vercel.app' }
 }
+# Re-installing on the same laptop: the key already saved can be kept.
+$oldKey = $null
+try { $oldKey = (Get-Content -Raw (Join-Path $Dest 'config.json') | ConvertFrom-Json).deviceKey } catch { }
+if (-not $Key -and $oldKey) {
+  $k = (Read-Host 'This laptop already has a key. Press Enter to keep it, or paste a new one').Trim()
+  $Key = if ($k) { $k } else { $oldKey }
+}
 if (-not $Key) { $Key = (Read-Host 'Paste the laptop key from Settings -> Aronium sync').Trim() }
 if ($Key -notmatch '^[A-Za-z0-9_-]{20,100}$') { Stop-Install 'That does not look like a laptop key. Copy it again from Settings -> Aronium sync.' }
 
@@ -50,23 +57,26 @@ foreach ($f in 'beiroot-sync.ps1', 'run-hidden.vbs') {
 $cfg = [ordered]@{ apiUrl = $ApiUrl.TrimEnd('/'); deviceKey = $Key; dbPath = $db; sqliteDll = $dll }
 ($cfg | ConvertTo-Json) | Set-Content -Path (Join-Path $Dest 'config.json') -Encoding UTF8
 
-# 4. Start from the newest closed register, so old days are not sent again.
-#    -SendLatest (or answering Y) also sends the most recent one now, to test.
-if (-not $SendLatest -and -not $env:BEIROOT_SYNC_TEST_QUERY) {
-  $a = Read-Host 'Send the most recent closed register now, as a test? (Y/N, branch laptops: N)'
-  $SendLatest = ($a -match '^[Yy]')
+# 4. Where to start: registers closed in the last 24 hours are sent now (so last night's close
+#    is not missed when installing the morning after); older ones are not sent.
+#    -SendLatest (testing only) sends the most recent close whatever its age.
+$sqlRecent = "select coalesce(max(Id), 0) as m from ZReport where substr(DateCreated, 1, 19) < datetime('now', 'localtime', '-1 day')"
+$sqlMax = 'select coalesce(max(Id), 0) as m from ZReport'
+function Get-One([string]$sql) {
+  if ($env:BEIROOT_SYNC_TEST_QUERY) { return [int64](($sql | & $env:BEIROOT_SYNC_TEST_QUERY | ConvertFrom-Json)[0].m) }
+  $cmd = $script:c.CreateCommand(); $cmd.CommandText = $sql; return [int64]$cmd.ExecuteScalar()
 }
 try {
-  if ($env:BEIROOT_SYNC_TEST_QUERY) {
-    $max = [int64](('select coalesce(max(Id), 0) as m from ZReport' | & $env:BEIROOT_SYNC_TEST_QUERY | ConvertFrom-Json)[0].m)
-  } else {
+  if (-not $env:BEIROOT_SYNC_TEST_QUERY) {
     Add-Type -Path $dll
-    $c = New-Object System.Data.SQLite.SQLiteConnection("Data Source=$db;Version=3;Read Only=True;FailIfMissing=True;Pooling=False")
-    $c.Open(); $cmd = $c.CreateCommand(); $cmd.CommandText = 'select coalesce(max(Id), 0) from ZReport'
-    $max = [int64]$cmd.ExecuteScalar(); $c.Close()
+    $script:c = New-Object System.Data.SQLite.SQLiteConnection("Data Source=$db;Version=3;Read Only=True;FailIfMissing=True;Pooling=False")
+    $script:c.Open()
   }
+  $max = Get-One $sqlMax
+  $start = if ($SendLatest -and $max -gt 0) { $max - 1 } else { Get-One $sqlRecent }
+  if (-not $env:BEIROOT_SYNC_TEST_QUERY) { $script:c.Close() }
 } catch { Stop-Install "Could not read Aronium's database: $($_.Exception.Message)" }
-$start = $max; if ($SendLatest -and $max -gt 0) { $start = $max - 1 }
+if ($start -lt $max) { Say "Registers closed in the last 24 hours will be sent now." } else { Say "No register closed in the last 24 hours. The next close will be sent." }
 $state = [ordered]@{ lastZId = $start; lastProductsAt = $null; lastError = $null; lastSentAt = $null }
 ($state | ConvertTo-Json) | Set-Content -Path (Join-Path $Dest 'state.json') -Encoding UTF8
 
