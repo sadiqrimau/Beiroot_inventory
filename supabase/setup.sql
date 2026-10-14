@@ -116,7 +116,7 @@ begin
       if f in ('cost_price','count_unit','purchase_unit','units_per_purchase')
          and (o->>f) is not null and not is_owner
          and not (f = 'units_per_purchase' and (o->>f)::numeric = 1 and o->>'purchase_unit' is null) then
-        raise exception 'Only the owner can change % once it is set.', f;
+        raise exception 'Only the admin can change % once it is set.', f;
       end if;
       insert into item_changes(item_id, changed_by, field, old_value, new_value)
       values (old.id, auth.uid(), f, o->>f, n->>f);
@@ -148,8 +148,8 @@ language plpgsql stable security definer set search_path = public, pg_temp as $$
 declare p profiles;
 begin
   select * into p from profiles where id = auth.uid();
-  if p.id is null then raise exception 'Your account is not set up. Ask the owner.'; end if;
-  if not p.active then raise exception 'Your account has been switched off. Ask the owner.'; end if;
+  if p.id is null then raise exception 'Your account is not set up. Ask the admin.'; end if;
+  if not p.active then raise exception 'Your account has been switched off. Ask the admin.'; end if;
   return p;
 end $$;
 
@@ -210,7 +210,7 @@ begin
   end if;
   if p_occurred is not null then
     if p_occurred > now() + interval '5 minutes' then raise exception 'That time is in the future.'; end if;
-    if p_occurred < now() - interval '7 days' then raise exception 'Entries older than 7 days must be added by the owner as a correction.'; end if;
+    if p_occurred < now() - interval '7 days' then raise exception 'Entries older than 7 days must be added by the admin as a correction.'; end if;
     occ := p_occurred;
   end if;
   insert into events(type, occurred_at, actor_id, actor_name, actor_role, location_id, source, paper_page, data)
@@ -386,7 +386,7 @@ begin
   elsif p_kind in ('planned','topup') then
     perform _need(p, 'branch_manager'); role := 'branch_manager';
     dest := p.branch_id;
-    if dest is null then raise exception 'Your account has no branch. Ask the owner.'; end if;
+    if dest is null then raise exception 'Your account has no branch. Ask the admin.'; end if;
   else raise exception 'Unknown request type.'; end if;
   rq := 'REQ-' || lpad(nextval('req_seq')::text, 5, '0');
   perform _emit(p, 'REQUEST', dest, jsonb_build_object('reqId', rq, 'dest', dest, 'branch', dest,
@@ -530,7 +530,7 @@ begin
   if coalesce(array_length(p_issue_ids, 1), 0) = 0 then raise exception 'Choose the ingredients this batch used.'; end if;
   for o in select * from jsonb_array_elements(_lines(p_outputs)) loop
     if (select kind from items where id = o->>'code') <> 'prepared' then
-      raise exception '% is not a kitchen-made item. Ask the owner to add it as prepared.', o->>'code';
+      raise exception '% is not a kitchen-made item. Ask the admin to add it as prepared.', o->>'code';
     end if;
   end loop;
   b := 'B-' || lpad(nextval('batch_seq')::text, 5, '0');
@@ -603,7 +603,7 @@ declare p profiles := _me(); w profiles; fees jsonb := '[]'; refunds jsonb := '[
   total_fees numeric := 0; total_refunds numeric := 0;
 begin
   perform _need(p, 'cashier');
-  if p.branch_id is null then raise exception 'Your account has no branch. Ask the owner.'; end if;
+  if p.branch_id is null then raise exception 'Your account has no branch. Ask the admin.'; end if;
   if p_date is null or p_date > lagos_today() or p_date < lagos_today() - 1 then
     raise exception 'The date must be today or yesterday.'; end if;
   if exists (select 1 from events where type = 'CASH_EOD' and location_id = p.branch_id and data->>'businessDate' = p_date::text) then
@@ -649,7 +649,7 @@ declare p profiles := _me(); role text;
 begin
   perform _need(p, 'cashier', 'branch_manager');
   role := case when _has(p, 'cashier') then 'cashier' else 'branch_manager' end;
-  if p.branch_id is null then raise exception 'Your account has no branch. Ask the owner.'; end if;
+  if p.branch_id is null then raise exception 'Your account has no branch. Ask the admin.'; end if;
   if p_date is null or p_date > lagos_today() or p_date < lagos_today() - 1 then
     raise exception 'The date must be today or yesterday.'; end if;
   if p_total is null or p_total < 0 then raise exception 'Enter Aronium''s total sales.'; end if;
@@ -914,7 +914,7 @@ begin
   foreach f in array array['name','category','size','price','aronium_name','note','sort','active'] loop
     if (o->>f) is distinct from (n->>f) then
       if f = 'price' and (o->>f) is not null and not is_owner then
-        raise exception 'Only the owner can change a menu price once it is set.';
+        raise exception 'Only the admin can change a menu price once it is set.';
       end if;
       insert into menu_changes(menu_item_id, changed_by, field, old_value, new_value) values (old.id, auth.uid(), f, o->>f, n->>f);
     end if;

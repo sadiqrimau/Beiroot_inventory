@@ -76,7 +76,7 @@ const store = {
       <h2>Deliveries to receive</h2>${grn}
       <h2>Requests to release</h2>${reqs}
       <details class="card"><summary>Emergency release without a request</summary>
-        <p class="lede">Only when it truly cannot wait. Every emergency release goes on the owner's review list.</p>
+        <p class="lede">Only when it truly cannot wait. Every emergency release goes on the admin's review list.</p>
         <label>Branch<select id="em-dest">${branchesOf(S).map(b => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join('')}</select></label>
         <label>Why it could not wait<input id="em-reason"></label>
         ${staffSelect('em-driver', S.staff, { roles: ['driver'], label: 'Driver' })}
@@ -109,7 +109,7 @@ const store = {
       need(val('em-reason'), 'Give the reason.'); need(val('em-driver'), 'Choose the driver.'); need(file('em-photo'), 'Add a photo of the stock being released.');
       const photo = await uploadPhoto(file('em-photo'), S.me.id);
       const mv = await rpc('emergency_release', { p_dest: val('em-dest'), p_reason: val('em-reason'), p_lines: lines, p_carrier: val('em-driver'), p_photo: photo });
-      toast(`Emergency release ${mv} logged for the owner's review.`); },
+      toast(`Emergency release ${mv} logged for the admin's review.`); },
     writeoff: doWriteOff,
   },
 };
@@ -122,7 +122,7 @@ const buy = {
     const raw = S.items.filter(i => i.kind === 'raw');
     const low = d.low || [];
     const lowCard = low.length ? `<div class="card low"><h3>Low stock in the store <span class="tag bad">${low.length}</span></h3>
-      <p class="lede">These items are at or below the level the owner set for reordering. Check with the storekeeper how much to buy.</p>
+      <p class="lede">These items are at or below the level the admin set for reordering. Check with the storekeeper how much to buy.</p>
       <ul class="plain">${low.map(i => `<li><b>${esc(i.name)}</b> <small>${esc(i.category)} · reorder at ${num(i.reorderLevel)} ${esc(i.unit || '')}</small>
         ${i.ordered ? '<span class="tag ok">Bought, waiting for the storekeeper</span>' : ''}</li>`).join('')}</ul></div>`
       : `<p class="done">No items are low in the store.</p>`;
@@ -251,7 +251,7 @@ const cash = {
     const auto = d.t.aroniumAuto;
     const needAron = auto ? [] : days.filter(([, , x]) => x.cashEod && !x.aroniumTotal);
     if (auto && d.t.cashEod) return `<section><h2>End of day · ${esc(S.me.branch_name || '')}</h2><p class="done">Today's money received is saved. Thank you.</p>
-      <p class="lede">Remember to close the register in Aronium. Its report is sent to the owner automatically; there is nothing to print.
+      <p class="lede">Remember to close the register in Aronium. Its report is sent to the admin automatically; there is nothing to print.
       ${d.t.aroniumTotal ? '<br><span class="tag ok">Aronium report received</span>' : ''}</p></section>`;
     if (!needAron.length && d.t.cashEod) return `<section><h2>End of day · ${esc(S.me.branch_name || '')}</h2><p class="done">Today's end of day is complete. Thank you.</p></section>`;
     // Step 2 comes first on screen when step 1 is done for a day.
@@ -266,16 +266,16 @@ const cash = {
     return `<section><h2>End of day · ${esc(S.me.branch_name || '')}</h2>
       <div class="card"><h3>${auto ? 'Money received' : 'Step 1 of 2: money received'}</h3>
       <p class="lede">Count the cash with the branch manager watching. Enter each amount and add its photo or screenshot. You can't change it after submitting. ${auto
-        ? 'Close the register in Aronium as usual: its report goes to the owner automatically, with no printing.' : 'You enter the Aronium total after this.'}</p>
+        ? 'Close the register in Aronium as usual: its report goes to the admin automatically, with no printing.' : 'You enter the Aronium total after this.'}</p>
       <label>Date<select id="ce-date">${needMoney.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label></div>
       ${MONEY.map(([k, l, hint]) => `<div class="card money"><label>${esc(l)} (₦)${hint ? ` <small>${esc(hint)}</small>` : ''}<input type="number" inputmode="decimal" min="0" id="ce-${k}" placeholder="0"></label>
         ${photoField('ce-ph-' + k, k === 'cash' ? 'Photo of the counted cash' : 'Screenshot (needed if the amount is more than 0)', true)}</div>`).join('')}
       ${staffSelect('ce-witness', S.staff, { exclude: S.me.id, roles: ['branch_manager', 'owner', 'admin'], label: 'Who watched the cash count', branch: S.me.branch_id })}
       <div class="card"><h3>Delivery fees</h3><p class="lede">One line per delivery order: the order number, the fee the customer paid, and how they paid it.</p>
         <div id="ce-fees"></div><button type="button" class="ghost" data-act="addfee">Add delivery</button></div>
-      <div class="card"><h3>Refunds</h3><p class="lede">Money given back to a customer today: the order number, the amount and why. The owner is alerted for every refund.</p>
+      <div class="card"><h3>Refunds</h3><p class="lede">Money given back to a customer today: the order number, the amount and why. The admin is alerted for every refund.</p>
         <div id="ce-refunds"></div><button type="button" class="ghost" data-act="addrefund">Add refund</button></div>
-      <label>Note for the owner <small>anything unusual today</small><textarea id="ce-note" rows="3" placeholder="e.g. POS was down for an hour, a customer paid the next day…"></textarea></label>
+      <label>Note for the admin <small>anything unusual today</small><textarea id="ce-note" rows="3" placeholder="e.g. POS was down for an hour, a customer paid the next day…"></textarea></label>
       <button class="primary" data-act="cashEod">Submit money received</button></section>`;
   },
   act: {
@@ -320,7 +320,7 @@ export const countTab = {
   view(S) {
     const loc = S.countLoc || 'store';
     const list = S.items.filter(i => i.count_frequency === 'daily' || S.countAll);
-    return `<section><h2>Blind count</h2><p class="lede">Count what is physically there. Expected figures stay hidden; the owner sees the gaps afterwards. Leave an item blank if you did not count it.</p>
+    return `<section><h2>Blind count</h2><p class="lede">Count what is physically there. Expected figures stay hidden; the admin sees the gaps afterwards. Leave an item blank if you did not count it.</p>
       <label>Location<select id="ct-loc" data-change="countLoc">${S.locations.filter(l => l.active).map(l => `<option value="${esc(l.id)}" ${l.id === loc ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}</select></label>
       <label class="check"><input type="checkbox" data-toggle="countAll" ${S.countAll ? 'checked' : ''}> Include weekly items</label>
       ${lineEditor('ct-lines', S.items, list.map(i => ({ code: i.id })), { blind: true })}
@@ -329,7 +329,7 @@ export const countTab = {
   act: {
     async count(S) { const lines = readLines('ct-lines', { allowZero: true }); need(lines.length, 'Enter at least one counted item.');
       const r = await rpc('submit_count', { p_loc: val('ct-loc'), p_lines: lines });
-      toast(r.held ? 'Count held: you look after this stock, so someone else must count it.' : 'Count saved. The owner will see any gaps.'); },
+      toast(r.held ? 'Count held: you look after this stock, so someone else must count it.' : 'Count saved. The admin will see any gaps.'); },
   },
 };
 

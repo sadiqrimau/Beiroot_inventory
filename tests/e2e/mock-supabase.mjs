@@ -156,12 +156,12 @@ const server = http.createServer(async (req, res) => {
       if (body.action === 'bootstrap') {
         if (body.code !== 'test-code') return send(res, 403, { error: 'Wrong setup code.' });
         const c = await serial(() => db.query(`select count(*)::int c from profiles where 'owner' = any(roles)`));
-        if (c.rows[0].c) return send(res, 409, { error: 'The owner account already exists. Sign in instead.' });
+        if (c.rows[0].c) return send(res, 409, { error: 'The admin account already exists. Sign in instead.' });
         await create({ ...body, roles: ['owner'] }); return send(res, 200, { ok: true });
       }
       if (!uid) return send(res, 401, { error: 'Sign in first.' });
       const me = (await serial(() => db.query('select * from profiles where id = $1', [uid]))).rows[0];
-      if (!me.roles.some(r => r === 'owner' || r === 'admin')) return send(res, 403, { error: 'Only the owner or admin can manage staff.' });
+      if (!me.roles.some(r => r === 'owner' || r === 'admin')) return send(res, 403, { error: 'Only the admin or assistant admin can manage staff.' });
       if (body.action === 'create') { try { const id = await create(body); return send(res, 200, { ok: true, id }); } catch (e) { return send(res, 400, { error: e.message }); } }
       if (body.action === 'update') {
         if (body.roles) await serial(() => db.query('update profiles set roles = $1, branch_id = $2 where id = $3', [body.roles, body.branchId || null, body.userId]));

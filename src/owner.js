@@ -5,7 +5,7 @@ import { $, esc, naira, num, fmtT, fmtD, toast, lineEditor, readLines, lagosDate
 
 const need = (c, m) => { if (!c) throw new Error(m); };
 const val = id => ($('#' + id) || {}).value?.trim?.() ?? '';
-const ROLE_LABEL = { owner: 'Owner', admin: 'Admin', storekeeper: 'Storekeeper', buyer: 'Procurement officer', driver: 'Driver',
+const ROLE_LABEL = { owner: 'Admin', admin: 'Assistant admin', storekeeper: 'Storekeeper', buyer: 'Procurement officer', driver: 'Driver',
   cook: 'Central kitchen cook', branch_manager: 'Branch manager', kitchen_lead: 'Kitchen lead', cashier: 'Cashier', counter: 'Counter' };
 const BRANCH_ROLES = ['branch_manager', 'kitchen_lead', 'cashier'];
 const EV_LABEL = { PURCHASE: 'Purchase logged', GRN: 'Goods received', REQUEST: 'Request', RELEASE: 'Released', RECEIPT: 'Received at branch',
@@ -340,7 +340,7 @@ const settings = {
             ${lineEditor('mr-' + m.id, S.items, lines)}
             <button class="primary" data-act="saveRecipe" data-id="${esc(m.id)}">Save measurements</button></details></div>`; };
       const withRecipe = menu.filter(m => m.active && rec(m.id).length).length, activeN = menu.filter(m => m.active).length;
-      body = `<p class="lede">The restaurant's menu. Switch an item off when it's no longer sold; it's never deleted, so past reports stay right. ${isOwner ? '' : 'Only the owner can change a price once it is set.'}
+      body = `<p class="lede">The restaurant's menu. Switch an item off when it's no longer sold; it's never deleted, so past reports stay right. ${isOwner ? '' : 'Only the admin can change a price once it is set.'}
         Aronium's item names are matched ignoring capitals and extra spaces; link any others below. Measurements set: <b>${withRecipe} of ${activeN}</b>.</p>
         ${unlinkedHtml}
         ${cats.map(c => `<h3 class="rep-h">${esc(c)}</h3>${menu.filter(m => m.category === c).map(row).join('')}`).join('') || '<p class="empty">No menu items yet.</p>'}
@@ -353,7 +353,7 @@ const settings = {
           <button class="primary" data-act="addMenu">Add to menu</button></div>`;
     } else if (S.setTab === 'items') {
       const cats = [...new Set(raw.items.map(i => i.category))].sort();
-      body = `<p class="lede">Prices and units can be set once the new suppliers are agreed. Until an item has a price, alerts use quantities. Items are switched off, never deleted. ${isOwner ? '' : 'Only the owner can change a price or unit once it is set.'}</p>
+      body = `<p class="lede">Prices and units can be set once the new suppliers are agreed. Until an item has a price, alerts use quantities. Items are switched off, never deleted. ${isOwner ? '' : 'Only the admin can change a price or unit once it is set.'}</p>
         <div class="scroll"><table class="items"><thead><tr><th>Item</th><th>Category</th><th>Count unit</th><th>Bought as</th><th class="n">Per bulk unit</th><th class="n">Cost ₦ / unit</th><th class="n">Reorder at</th><th>Count</th><th>Expiry</th><th>Active</th><th></th></tr></thead><tbody>
         ${raw.items.slice().sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)).map(i => `<tr data-item="${esc(i.id)}" class="${i.active ? '' : 'off'}">
           <td><input value="${esc(i.name)}" data-f="name"></td><td><input value="${esc(i.category)}" data-f="category" list="cats"></td>
@@ -409,7 +409,7 @@ const settings = {
           <label>Laptop name<input id="nd-name" placeholder="e.g. Tanke counter laptop"></label>
           <button class="primary" data-act="addDevice">Create key</button></div>`;
     } else if (S.setTab === 'rules') {
-      body = `<p class="lede">${isOwner ? 'Change when alerts fire. The defaults came from the simulation.' : 'Only the owner can change these.'}</p>
+      body = `<p class="lede">${isOwner ? 'Change when alerts fire. The defaults came from the simulation.' : 'Only the admin can change these.'}</p>
         ${RULE_FIELDS.map(([k, l]) => `<label>${esc(l)}<input type="number" step="any" id="rule-${k}" value="${ctx.rules[k] ?? ''}" ${isOwner ? '' : 'disabled'}></label>`).join('')}
         ${isOwner ? '<button class="primary" data-act="saveRules">Save rules</button>' : ''}`;
     } else {

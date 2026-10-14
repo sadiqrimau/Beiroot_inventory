@@ -49,7 +49,7 @@ export default async function handler(req, res) {
       if (!BOOTSTRAP) return fail(res, 500, 'BOOTSTRAP_CODE is not set in Vercel.');
       if (body.code !== BOOTSTRAP) return fail(res, 403, 'Wrong setup code.');
       const { count } = await admin.from('profiles').select('id', { count: 'exact', head: true }).contains('roles', ['owner']);
-      if (count > 0) return fail(res, 409, 'The owner account already exists. Sign in instead.');
+      if (count > 0) return fail(res, 409, 'The admin account already exists. Sign in instead.');
       const bad = validate({ ...body, roles: ['owner'] }, true); if (bad) return fail(res, 400, bad);
       const r = await createUser({ ...body, roles: ['owner'] });
       return r.error ? fail(res, 400, r.error) : res.status(200).json({ ok: true });
@@ -61,27 +61,27 @@ export default async function handler(req, res) {
     const { data: who, error: we } = await admin.auth.getUser(token);
     if (we || !who.user) return fail(res, 401, 'Your session expired. Sign in again.');
     const { data: me } = await admin.from('profiles').select('*').eq('id', who.user.id).single();
-    if (!me || !me.active || !me.roles.some(r => r === 'owner' || r === 'admin')) return fail(res, 403, 'Only the owner or admin can manage staff.');
+    if (!me || !me.active || !me.roles.some(r => r === 'owner' || r === 'admin')) return fail(res, 403, 'Only the admin or assistant admin can manage staff.');
     const isOwner = me.roles.includes('owner');
     const touchesTop = roles => (roles || []).some(r => r === 'owner' || r === 'admin');
 
     if (action === 'create') {
       const bad = validate(body, true); if (bad) return fail(res, 400, bad);
-      if (touchesTop(body.roles) && !isOwner) return fail(res, 403, 'Only the owner can create owner or admin accounts.');
+      if (touchesTop(body.roles) && !isOwner) return fail(res, 403, 'Only the admin can create admin or assistant admin accounts.');
       const r = await createUser(body);
       return r.error ? fail(res, 400, r.error) : res.status(200).json({ ok: true, id: r.id });
     }
 
     const { data: target } = await admin.from('profiles').select('*').eq('id', body.userId).single();
     if (!target) return fail(res, 404, 'Staff member not found.');
-    if (touchesTop(target.roles) && !isOwner) return fail(res, 403, 'Only the owner can change an owner or admin account.');
+    if (touchesTop(target.roles) && !isOwner) return fail(res, 403, 'Only the admin can change an admin or assistant admin account.');
 
     if (action === 'update') {
       const patch = {};
       if (body.roles !== undefined) {
         const bad = validate({ roles: body.roles, branchId: body.branchId ?? target.branch_id }); if (bad) return fail(res, 400, bad);
-        if (touchesTop(body.roles) && !isOwner) return fail(res, 403, 'Only the owner can give owner or admin roles.');
-        if (target.id === me.id && isOwner && !body.roles.includes('owner')) return fail(res, 400, 'You cannot remove your own owner role.');
+        if (touchesTop(body.roles) && !isOwner) return fail(res, 403, 'Only the admin can give admin or assistant admin roles.');
+        if (target.id === me.id && isOwner && !body.roles.includes('owner')) return fail(res, 400, 'You cannot remove your own admin role.');
         patch.roles = body.roles;
       }
       if (body.branchId !== undefined) patch.branch_id = body.branchId || null;

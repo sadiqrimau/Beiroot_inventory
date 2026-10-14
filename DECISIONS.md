@@ -2,6 +2,10 @@
 
 The design decisions come from [`docs/BUILD_SPEC.md`](docs/BUILD_SPEC.md). This file records choices made while building, and anything that differs from the spec. Newest first.
 
+## 2026-10-14: The owner is shown as "Admin"
+
+The owner asked to be called **Admin**, not Owner. Only the wording on screen changed: the `owner` role is shown as **Admin** and the `admin` role as **Assistant admin**, in the app, the error messages and the staff guides. Role ids and permissions are unchanged (only the Admin can change a price or unit once set, the alert rules, and admin accounts).
+
 ## 2026-10-12: Aronium sync, storekeeper photos, low stock
 
 | Decision | Detail |

@@ -122,7 +122,7 @@ if (fl.rows[0].cost_price !== null) { fail++; console.log('FAIL storekeeper upda
 await as('owner', `update items set cost_price = 100 where id = 'flour'`);
 await db.exec(`select set_config('request.jwt.claim.sub', '${U.owner}', false)`);
 await db.query(`update profiles set roles = array['admin'] where id = $1`, [U.bm2]);
-await as('bm2', `update items set cost_price = 200 where id = 'flour'`, [], 'Only the owner');
+await as('bm2', `update items set cost_price = 200 where id = 'flour'`, [], 'Only the admin');
 await as('owner', `update items set cost_price = 200 where id = 'flour'`);
 const ch = await db.query(`select count(*)::int c from item_changes where item_id='flour'`);
 console.log('item changes logged:', ch.rows[0].c);
@@ -140,7 +140,7 @@ if (rl[0].c !== 2) { fail++; console.log('FAIL recipe lines', rl[0].c); } else n
 const mch = await as('owner', `select count(*)::int as c from menu_changes where menu_item_id = 'wrap-regular'`);
 if (mch[0].c !== 3) { fail++; console.log('FAIL menu change log', mch[0].c); } else n++;
 await as('owner', `select save_menu_recipe('wrap-regular', '[{"code":"nope","qty":1}]'::jsonb)`, [], 'Unknown stock item');
-await as('bm2', `update menu_items set price = 9999 where id = 'wrap-regular'`, [], 'Only the owner');
+await as('bm2', `update menu_items set price = 9999 where id = 'wrap-regular'`, [], 'Only the admin');
 await as('owner', `update menu_items set price = 3600 where id = 'wrap-regular'`);
 await as('owner', `delete from menu_items where id = 'wrap-regular'`, [], 'permission denied');
 await as('owner', `insert into menu_items(id, name, category, price) values ('drink-water', 'Water', 'Drinks', 300)`);

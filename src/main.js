@@ -4,7 +4,7 @@ import { $, esc, toast, wireLineEditors } from './ui.js';
 import { STAFF_TABS, countTab } from './staff.js';
 import { OWNER_TABS, openPhoto, invalidate } from './owner.js';
 
-const ROLE_LABEL = { owner: 'Owner', admin: 'Admin', storekeeper: 'Storekeeper', buyer: 'Procurement', driver: 'Driver', cook: 'Kitchen',
+const ROLE_LABEL = { owner: 'Admin', admin: 'Assistant admin', storekeeper: 'Storekeeper', buyer: 'Procurement', driver: 'Driver', cook: 'Kitchen',
   branch_manager: 'Branch manager', kitchen_lead: 'Kitchen lead', cashier: 'Cashier', counter: 'Counter' };
 
 const S = { me: null, staff: [], items: [], locations: [], paper: false, tab: null, data: {} };
@@ -32,12 +32,12 @@ function viewLogin(msg) {
       ${msg ? `<p class="err">${esc(msg)}</p>` : ''}
     </form>
     <details class="first"><summary>First-time setup</summary>
-      <p class="lede">Only once, to create the owner's account. You need the setup code that was added to Vercel.</p>
+      <p class="lede">Only once, to create the admin's account. You need the setup code that was added to Vercel.</p>
       <label>Setup code<input id="bs-code" type="password"></label>
-      <label>Owner's full name<input id="bs-name"></label>
-      <label>Owner's username<input id="bs-user" autocapitalize="none"></label>
-      <label>Owner's PIN (6 digits)<input id="bs-pin" inputmode="numeric" maxlength="6"></label>
-      <button type="button" id="bs-go">Create owner account</button>
+      <label>Admin's full name<input id="bs-name"></label>
+      <label>Admin's username<input id="bs-user" autocapitalize="none"></label>
+      <label>Admin's PIN (6 digits)<input id="bs-pin" inputmode="numeric" maxlength="6"></label>
+      <button type="button" id="bs-go">Create admin account</button>
     </details></section>`;
   $('#login').onsubmit = async ev => {
     ev.preventDefault();
@@ -57,7 +57,7 @@ function viewLogin(msg) {
 async function render(reload) {
   const tabs = tabsFor(S.me);
   if (!tabs.length) {
-    app().innerHTML = `<section class="setup"><h1>No role yet</h1><p class="lede">Your account has no role. Ask the owner to give you one.</p><button data-act-global="signout">Sign out</button></section>`;
+    app().innerHTML = `<section class="setup"><h1>No role yet</h1><p class="lede">Your account has no role. Ask the admin to give you one.</p><button data-act-global="signout">Sign out</button></section>`;
     return;
   }
   if (!tabs.find(t => t.id === S.tab)) S.tab = tabs[0].id;

@@ -211,7 +211,7 @@ r1 = await post(devKey, { kind: 'heartbeat', status: { version: '1.0.0', compute
 // cashier at a synced branch has no Aronium step and still sees no figures
 await cash.reload(); await cash.waitForSelector('main .done');
 const cashAuto = await cash.textContent('main');
-console.log((/sent to the owner automatically/.test(cashAuto) && !/12,700|299,950/.test(cashAuto) ? 'ok  ' : 'FAIL') + ' cashier: automatic, no figures');
+console.log((/sent to the admin automatically/.test(cashAuto) && !/12,700|299,950/.test(cashAuto) ? 'ok  ' : 'FAIL') + ' cashier: automatic, no figures');
 // owner links the unlinked Aronium name
 await owner.reload(); await owner.waitForSelector('header'); await btn(owner, 'Settings').click(); await owner.waitForSelector('.menu-row');
 const unl = await owner.locator('.unlinked').textContent(); console.log((/Beiroot Bomb/.test(unl) && !/Chicken Wrap Regular/i.test(unl) ? 'ok  ' : 'FAIL') + ' unlinked list: ' + unl.replace(/\s+/g, ' ').slice(0, 120));
