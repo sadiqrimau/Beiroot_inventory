@@ -402,7 +402,7 @@ const settings = {
         <ul class="plain">${devs.map(x => { const st = x.last_status || {};
           return `<li class="${x.active ? '' : 'off'}"><b>${esc(x.name)}</b> · ${esc(ctx.locs[x.branch_id] || x.branch_id)}
           ${x.active ? '' : ' <span class="tag bad">revoked</span>'}<br><small>${x.last_seen_at ? 'Last seen ' + fmtT(x.last_seen_at) : 'Not connected yet'}${st.version ? ' · version ' + esc(st.version) : ''}${st.computer ? ' · ' + esc(st.computer) : ''}</small>
-          ${st.error ? `<p class="note neg">${esc(st.error)}</p>` : ''}
+          ${st.error ? `<p class="note neg">${esc(st.error)}</p>${st.schema ? `<details><summary>Technical details (send to Sadiq)</summary><p class="lede">${esc(st.schema)}</p></details>` : ''}` : ''}
           ${x.active ? `<div class="actions"><button class="danger" data-act="revokeDevice" data-id="${x.id}">Revoke key</button></div>` : ''}</li>`; }).join('') || '<li class="empty">No laptops yet. Branches without one enter Aronium\'s total by hand.</li>'}</ul>
         <div class="card"><h3>Add a branch laptop</h3>
           <label>Branch<select id="nd-branch">${raw.locations.filter(l => l.kind === 'branch' && l.active).map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select></label>

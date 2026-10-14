@@ -5,7 +5,7 @@
 param([switch]$Check)
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.0.0'
+$Version = '1.0.1'
 $Here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ConfigPath = Join-Path $Here 'config.json'
 $StatePath = Join-Path $Here 'state.json'
@@ -81,6 +81,18 @@ function Get-MaxZId {
   return [int64]$r[0].m
 }
 
+# Aronium versions differ (e.g. older ones have no Payment.ZReportId), so check which columns exist.
+$script:colCache = @{}
+function Get-Cols([string]$table) {
+  if (-not $script:colCache.ContainsKey($table)) {
+    $set = @{}
+    foreach ($c in (Invoke-Query ("pragma table_info(" + $table + ")"))) { $set[[string]$c.name] = $true }
+    $script:colCache[$table] = $set
+  }
+  return $script:colCache[$table]
+}
+function Has-Col([string]$table, [string]$col) { return (Get-Cols $table).ContainsKey($col) }
+
 function Get-DocTypeId([string]$code) {
   $r = Invoke-Query ("select Id from DocumentType where Code = '" + [int]$code + "'")
   if ($r.Count -gt 0) { return [int64]$r[0].Id } else { return [int64]-1 }
@@ -90,9 +102,11 @@ function Build-Report($z) {
   $zid = [int64]$z.Id; $from = [int64]$z.FromDocumentId; $to = [int64]$z.ToDocumentId
   $sales = Get-DocTypeId '200'; $refund = Get-DocTypeId '220'
 
+  # Payments of this register close: by ZReportId where Aronium has it, otherwise by the close's receipt range.
+  $payWhere = if (Has-Col 'Payment' 'ZReportId') { "p.ZReportId = $zid" } else { "p.DocumentId between $from and $to" }
   $payments = New-Object System.Collections.ArrayList
   foreach ($p in (Invoke-Query ("select coalesce(pt.Name, 'Unknown') as name, cast(sum(p.Amount) as real) as amount, count(*) as cnt " +
-      "from Payment p left join PaymentType pt on pt.Id = p.PaymentTypeId where p.ZReportId = $zid group by pt.Name"))) {
+      "from Payment p left join PaymentType pt on pt.Id = p.PaymentTypeId where $payWhere group by pt.Name"))) {
     [void]$payments.Add([ordered]@{ name = [string]$p.name; amount = [double]$p.amount; count = [int]$p.cnt })
   }
 
@@ -106,9 +120,11 @@ function Build-Report($z) {
   $expected = 0; if ($to -ge $from -and $from -gt 0) { $expected = $to - $from + 1 }
   $missing = [Math]::Max(0, $expected - [int64]$d.n)
 
+  $lineTotal = if (Has-Col 'DocumentItem' 'TotalAfterDocumentDiscount') { 'di.TotalAfterDocumentDiscount' }
+               elseif (Has-Col 'DocumentItem' 'Total') { 'di.Total' } else { 'di.Price * di.Quantity' }
   $items = New-Object System.Collections.ArrayList
   foreach ($it in (Invoke-Query ("select pr.Name as name, cast(sum(di.Quantity) as real) as qty, " +
-      "cast(sum(di.TotalAfterDocumentDiscount) as real) as total from DocumentItem di " +
+      "cast(sum($lineTotal) as real) as total from DocumentItem di " +
       "join Document d on d.Id = di.DocumentId join Product pr on pr.Id = di.ProductId " +
       "where d.Id between $from and $to and d.DocumentTypeId = $sales group by pr.Name order by pr.Name"))) {
     [void]$items.Add([ordered]@{ name = [string]$it.name; qty = [double]$it.qty; total = [double]$it.total })
@@ -125,9 +141,13 @@ function Build-Report($z) {
 
 function Get-Products {
   $list = New-Object System.Collections.ArrayList
-  foreach ($p in (Invoke-Query ("select p.Name as name, cast(p.Price as real) as price, g.Name as grp, p.IsEnabled as enabled " +
-      "from Product p left join ProductGroup g on g.Id = p.ProductGroupId order by p.Name"))) {
-    [void]$list.Add([ordered]@{ name = [string]$p.name; price = [double]$p.price; group = [string]$p.grp; enabled = ([int]$p.enabled -ne 0) })
+  $enabled = if (Has-Col 'Product' 'IsEnabled') { 'p.IsEnabled' } else { '1' }
+  $price = if (Has-Col 'Product' 'Price') { 'cast(p.Price as real)' } else { 'null' }
+  $grp = if ((Has-Col 'Product' 'ProductGroupId') -and (Get-Cols 'ProductGroup').Count -gt 0) { 'g.Name' } else { 'null' }
+  $join = if ($grp -eq 'g.Name') { 'left join ProductGroup g on g.Id = p.ProductGroupId' } else { '' }
+  foreach ($p in (Invoke-Query ("select p.Name as name, $price as price, $grp as grp, $enabled as enabled " +
+      "from Product p $join order by p.Name"))) {
+    [void]$list.Add([ordered]@{ name = [string]$p.name; price = $(if ($null -ne $p.price) { [double]$p.price } else { $null }); group = [string]$p.grp; enabled = ([int]$p.enabled -ne 0) })
   }
   return ,$list
 }
@@ -195,13 +215,15 @@ try {
   } catch {
     $errorText = $_.Exception.Message
     Write-Log "ERROR: $errorText"
+    # Send which columns this Aronium version has, so the problem can be fixed remotely.
+    try { $script:schema = (@('ZReport','Payment','Document','DocumentItem','Product') | ForEach-Object { $_ + ': ' + ((Get-Cols $_).Keys -join ',') }) -join ' | ' } catch { }
   } finally { Close-Aronium }
 
   if ($errorText -ne $state.lastError) { $state.lastError = $errorText; Save-State $state }
   try {
     $hb = Send-Beiroot $cfg 'heartbeat' @{ status = [ordered]@{
       version = $Version; computer = $env:COMPUTERNAME; lastZId = $state.lastZId; pending = $pending
-      lastSentAt = $state.lastSentAt; error = $errorText; at = (Get-Date -Format 's') } }
+      lastSentAt = $state.lastSentAt; error = $errorText; schema = $script:schema; at = (Get-Date -Format 's') } }
     if ($Check) { Write-Log "Connected to Beiroot. Branch: $($hb.branch)." }
   } catch { Write-Log "ERROR: $($_.Exception.Message)"; if ($Check) { exit 2 } }
   if ($Check -and $errorText) { exit 3 }
