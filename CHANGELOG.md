@@ -14,6 +14,7 @@
 - Sync installer: sends registers closed in the last 24 hours (installing the morning after no longer skips last night's close); no more Y/N question; re-installing keeps the laptop's key.
 - The owner role is shown as **Admin**, and the admin role as **Assistant admin**, everywhere on screen. Staff guides updated (storekeeper photos, low stock, delivery fee "Paid by", cashier without the Aronium step at synced branches).
 - Sync 1.0.1: works with older Aronium versions (no `Payment.ZReportId`: payments are taken from the close's receipt range). On an error the laptop also reports which columns its Aronium has (Settings → Aronium sync → Technical details).
+- Settings → Staff: **Quick setup** creates one account per role (role-based usernames such as `adeta.cashier`, each with its own PIN shown once); names can now be edited.
 - Fix: switching tabs while a slow tab was loading could show the wrong screen.
 - Database: `sync_devices`, `aronium_products`, `menu_aliases`, `norm_name`, `create_sync_device`, `set_sync_device_active`, `link_aronium_name`, `_aronium_ingest`, `_store_balance`, `low_stock`; photo argument on `confirm_grn`, `release_stock`, `emergency_release`.
 

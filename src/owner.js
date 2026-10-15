@@ -8,6 +8,17 @@ const val = id => ($('#' + id) || {}).value?.trim?.() ?? '';
 const ROLE_LABEL = { owner: 'Admin', admin: 'Assistant admin', storekeeper: 'Storekeeper', buyer: 'Procurement officer', driver: 'Driver',
   cook: 'Central kitchen cook', branch_manager: 'Branch manager', kitchen_lead: 'Kitchen lead', cashier: 'Cashier', counter: 'Counter' };
 const BRANCH_ROLES = ['branch_manager', 'kitchen_lead', 'cashier'];
+// One starter account per role (and per branch for branch roles); names are edited during training.
+const STARTER_ACCOUNTS = raw => {
+  const out = [['storekeeper', 'storekeeper', 'Storekeeper'], ['procurement', 'buyer', 'Procurement officer'], ['driver', 'driver', 'Driver'],
+    ['cook', 'cook', 'Central kitchen cook']].map(([u, r, l]) => ({ username: u, roles: [r], branch: null, label: l }));
+  raw.locations.filter(l => l.kind === 'branch' && l.active).forEach(b => {
+    const short = b.name.replace(/\s*branch\s*/i, '').trim() || b.id;
+    [['manager', 'branch_manager', 'Branch manager'], ['kitchen', 'kitchen_lead', 'Kitchen lead'], ['cashier', 'cashier', 'Cashier']]
+      .forEach(([u, r, l]) => out.push({ username: `${b.id}.${u}`, roles: [r], branch: b.id, label: `${short} ${l.toLowerCase()}` }));
+  });
+  return out;
+};
 const EV_LABEL = { PURCHASE: 'Purchase logged', GRN: 'Goods received', REQUEST: 'Request', RELEASE: 'Released', RECEIPT: 'Received at branch',
   YIELD: 'Yield reported', WASTE: 'Write-off', COUNT: 'Blind count', KITCHEN_COUNT: 'Kitchen count', STORE_OPEN: 'Store opened',
   STORE_CLOSE: 'Store closed', CORRECTION: 'Correction', CASH_EOD: 'Money end of day', ARONIUM_TOTAL: 'Aronium total', USE: 'Usage',
@@ -376,12 +387,18 @@ const settings = {
       const locOpts = sel => `<option value="">—</option>` + raw.locations.filter(l => l.kind === 'branch').map(l => `<option value="${l.id}" ${l.id === sel ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
       const roleBoxes = (pfx, sel = []) => Object.entries(ROLE_LABEL).filter(([r]) => isOwner || !['owner', 'admin'].includes(r))
         .map(([r, l]) => `<label class="pill"><input type="checkbox" name="${pfx}" value="${r}" ${sel.includes(r) ? 'checked' : ''}>${l}</label>`).join('');
+      const seedable = STARTER_ACCOUNTS(raw).filter(a => !raw.profiles.some(p => p.username === a.username));
       body = `<p class="lede">Each person signs in with their own username and a 6-digit PIN. Branch roles (branch manager, kitchen lead, cashier) need a branch.</p>
+        ${S.newAccounts ? `<div class="card open"><h3>New accounts</h3><p class="lede">Write these down or copy them now; the PINs are shown only once. Give each person their username and PIN, then put their real name under Edit.</p>
+          <div class="scroll"><table><thead><tr><th>Role</th><th>Username</th><th>PIN</th></tr></thead><tbody>${S.newAccounts.map(a => `<tr><td>${esc(a.label)}</td><td>${esc(a.username)}</td><td>${a.error ? `<span class="tag bad">${esc(a.error)}</span>` : `<b>${esc(a.pin)}</b>`}</td></tr>`).join('')}</tbody></table></div>
+          <div class="actions"><button data-act="copyAccounts">Copy list</button><button class="ghost" data-act="doneAccounts">Done</button></div></div>` : ''}
+        ${seedable.length ? `<div class="card"><h3>Quick setup: one account for each role</h3><p class="lede">Creates ${seedable.length} account${seedable.length > 1 ? 's' : ''} (${esc(seedable.map(a => a.username).join(', '))}) with a role-based username and its own PIN. During training, just change each name to the person's real name.</p>
+          <button class="primary" data-act="seedStaff">Create ${seedable.length} account${seedable.length > 1 ? 's' : ''}</button></div>` : ''}
         <ul class="plain">${raw.profiles.map(p => `<li class="${p.active ? '' : 'off'}"><b>${esc(p.full_name)}</b> <small>@${esc(p.username)}</small>
           · ${p.roles.map(r => ROLE_LABEL[r] || r).join(', ') || 'no role'}${p.branch_id ? ' · ' + esc(ctx.locs[p.branch_id]) : ''}${p.active ? '' : ' · <span class="tag bad">switched off</span>'}
-          <details><summary>Edit</summary><div class="roles">${roleBoxes('r-' + p.id, p.roles)}</div>
+          <details><summary>Edit</summary><label>Full name<input id="fn-${p.id}" value="${esc(p.full_name)}"></label><div class="roles">${roleBoxes('r-' + p.id, p.roles)}</div>
             <label>Branch<select id="b-${p.id}">${locOpts(p.branch_id)}</select></label>
-            <div class="actions"><button data-act="saveStaff" data-id="${p.id}">Save roles</button>
+            <div class="actions"><button data-act="saveStaff" data-id="${p.id}">Save</button>
             <button data-act="resetPin" data-id="${p.id}">Set a new PIN</button>
             <button class="${p.active ? 'danger' : ''}" data-act="toggleStaff" data-id="${p.id}" data-on="${p.active ? '0' : '1'}">${p.active ? 'Switch off' : 'Switch on'}</button></div></details></li>`).join('')}</ul>
         <div class="card"><h3>Add a staff member</h3>
@@ -503,10 +520,27 @@ const settings = {
     },
     async saveStaff(S, b) {
       const id = b.dataset.id; const roles = [...document.querySelectorAll(`input[name="r-${id}"]:checked`)].map(x => x.value);
-      const br = val('b-' + id) || null;
+      const br = val('b-' + id) || null, fullName = val('fn-' + id);
+      need(fullName, 'Enter the full name.');
       need(!roles.some(r => BRANCH_ROLES.includes(r)) || br, 'Pick the branch for this person.');
-      await staffApi('update', { userId: id, roles, branchId: br }); invalidate(); toast('Saved.');
+      await staffApi('update', { userId: id, roles, branchId: br, fullName }); invalidate(); toast('Saved.');
     },
+    async seedStaff(S) {
+      const d = await ownerData();
+      const todo = STARTER_ACCOUNTS(d.raw).filter(a => !d.raw.profiles.some(p => p.username === a.username));
+      const out = [];
+      for (const a of todo) {
+        const pin = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, '0');
+        try { await staffApi('create', { fullName: a.label, username: a.username, pin, roles: a.roles, branchId: a.branch }); out.push({ ...a, pin }); }
+        catch (e) { out.push({ ...a, error: e.message }); }
+      }
+      S.newAccounts = out; invalidate(); toast(`${out.filter(a => !a.error).length} accounts created. Copy the PINs now.`);
+    },
+    async copyAccounts(S) {
+      const t = S.newAccounts.filter(a => !a.error).map(a => `${a.label}: username ${a.username}, PIN ${a.pin}`).join('\n');
+      try { await navigator.clipboard.writeText(t); toast('List copied.'); } catch (e) { toast('Select the table and copy it.', true); } return 'stay';
+    },
+    doneAccounts(S) { S.newAccounts = null; return 'rerender'; },
     async resetPin(S, b) {
       const pin = prompt('New 6-digit PIN for this person:'); if (pin === null) return 'stay';
       need(/^\d{6}$/.test(pin), 'The PIN must be 6 digits.');

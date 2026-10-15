@@ -165,6 +165,7 @@ const server = http.createServer(async (req, res) => {
       if (body.action === 'create') { try { const id = await create(body); return send(res, 200, { ok: true, id }); } catch (e) { return send(res, 400, { error: e.message }); } }
       if (body.action === 'update') {
         if (body.roles) await serial(() => db.query('update profiles set roles = $1, branch_id = $2 where id = $3', [body.roles, body.branchId || null, body.userId]));
+        if (body.fullName) await serial(() => db.query('update profiles set full_name = $1 where id = $2', [body.fullName, body.userId]));
         if (body.active !== undefined) { await serial(() => db.query('update profiles set active = $1 where id = $2', [!!body.active, body.userId])); if (!body.active) banned.add(body.userId); else banned.delete(body.userId); }
         return send(res, 200, { ok: true });
       }

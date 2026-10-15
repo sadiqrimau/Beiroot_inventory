@@ -219,6 +219,20 @@ await owner.locator('select[data-alias="Beiroot Bomb"]').selectOption('sub-bomb-
 await owner.locator('button[data-act=linkAlias][data-name="Beiroot Bomb"]').click(); await expectToast(owner, /Linked/, 'link Aronium name');
 const aliasTxt = await owner.locator('.menu-row[data-menu="sub-bomb-regular"]').textContent(); console.log((/Beiroot Bomb/.test(aliasTxt) ? 'ok  ' : 'FAIL') + ' alias shown on the menu item');
 
+// --- quick setup: one account per role, then rename one ---
+await btn(owner, 'Settings').click(); await btn(owner, 'Staff').click();
+await btn(owner, 'Create 10 accounts').click(); await expectToast(owner, /10 accounts created/, 'one account per role');
+const acc = await owner.locator('.card.open table').textContent();
+console.log((/adeta\.cashier/.test(acc) && /tanke\.kitchen/.test(acc) && /\d{6}/.test(acc) ? 'ok  ' : 'FAIL') + ' starter accounts listed with PINs');
+const pinRow = await owner.locator('.card.open tr', { hasText: 'adeta.cashier' }).textContent();
+const adPin = pinRow.match(/(\d{6})/)[1];
+await btn(owner, 'Done').click();
+const row = owner.locator('li', { hasText: '@adeta.cashier' });
+await row.locator('summary').click(); await row.locator('input[id^=fn-]').fill('Zainab Cashier');
+await row.locator('button', { hasText: 'Save' }).first().click(); await expectToast(owner, /Saved/, 'rename starter account');
+const ac = await user('adeta-cashier'); await login(ac, 'adeta.cashier', adPin);
+console.log(((await ac.textContent('header')).includes('Zainab Cashier') ? 'ok  ' : 'FAIL') + ' renamed cashier signs in with the shown PIN');
+
 // --- owner reviews ---
 await owner.reload(); await owner.waitForSelector('header');
 await btn(owner, 'Today').click(); await owner.waitForSelector('.headline');
