@@ -84,7 +84,7 @@ At the top of your screen, **Low stock in the store** lists items at or below th
 2. Tap **Choose item…**, pick the item and type the quantity. Tap **Add item** for each extra item.
 3. If you bought in bulk (bags, cartons), tick **in bag** (or the bulk unit shown) so the system converts it for you.
 4. Type the **Price ₦ each**.
-5. Take a **photo of the invoice or receipt**.
+5. Take a **Photo of the items bought** (every purchase), and a **photo of the invoice or receipt** if there is one.
 6. Tap **Log purchase**. Write the **PO number** the screen shows on the invoice.
 
 Take the goods to the **store** every time, never straight to a branch. The storekeeper counts what arrived without seeing your numbers. Any difference shows up for the admin.
@@ -260,6 +260,6 @@ for title, screen, lede, body in ROLES:
 <p class="lede">{lede}</p><span class="screen">Your screen: {screen}</span>
 <div class="box"><div>{md(SIGNIN)}</div><div>{md(RULES)}</div></div>
 {md(body)}
-<footer>Updated 14 October 2026. Questions: ask the admin.</footer></body></html>"""
+<footer>Updated 17 October 2026. Questions: ask the admin.</footer></body></html>"""
     (OUT / f"Beiroot-Guide-{slug}.html").write_text(html)
     print(slug)

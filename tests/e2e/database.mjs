@@ -47,7 +47,8 @@ const one = async (...a) => { const r = await as(...a); return r && r[0] && Obje
 await as('buyer', "select store_open('x')", [], 'role cannot');
 const sid = await one('store', "select store_open('Morning delivery', array['Tunde'])");
 await as('store', "select store_open('again')", [], 'already open');
-const po = await one('buyer', `select log_purchase('Mile 12', '[{"code":"chicken","qty":20,"unitPrice":4500},{"code":"vegetable-oil","qty":2,"inPurchaseUnits":true}]'::jsonb)`);
+await as('buyer', `select log_purchase('Mile 12', '[{"code":"chicken","qty":20}]'::jsonb)`, [], 'photo of the items bought');
+const po = await one('buyer', `select log_purchase('Mile 12', '[{"code":"chicken","qty":20,"unitPrice":4500},{"code":"vegetable-oil","qty":2,"inPurchaseUnits":true}]'::jsonb, p_goods_photo => 'goods.jpg')`);
 const pend = await one('store', 'select pending_purchases()');
 if (JSON.stringify(pend).includes('"qty"')) { fail++; console.log('FAIL pending_purchases leaks qty'); } else n++;
 await as('store', `select confirm_grn($1, '[{"code":"chicken","qty":18},{"code":"vegetable-oil","qty":2}]'::jsonb)`, [po], 'photo of the goods');

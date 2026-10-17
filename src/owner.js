@@ -271,7 +271,7 @@ function summary(ctx, e) {
     default: return '';
   }
 }
-const photosOf = e => [e.photoPath, e.invoicePhoto, ...Object.values(e.photos || {})].filter(Boolean);
+const photosOf = e => [e.photoPath, e.goodsPhoto, e.invoicePhoto, ...Object.values(e.photos || {})].filter(Boolean);
 const ledger = {
   id: 'ledger', label: 'Ledger', roles: ['owner', 'admin'],
   load: () => ownerData(),

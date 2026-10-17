@@ -304,12 +304,15 @@ end $$;
 -- ---------- Purchases (buyer) and goods received (storekeeper) ---------
 
 -- Lines: [{code, qty, inPurchaseUnits?, unitPrice?}]. Stored in counting units.
+-- A photo of the items bought is required (except paper-book entries); the invoice photo is optional.
+drop function if exists public.log_purchase(text, jsonb, text, timestamptz, text);
 create or replace function public.log_purchase(p_supplier text, p_lines jsonb, p_invoice_photo text default null,
-  p_occurred timestamptz default null, p_paper_page text default null)
+  p_occurred timestamptz default null, p_paper_page text default null, p_goods_photo text default null)
 returns text language plpgsql security definer set search_path = public, pg_temp as $$
 declare p profiles := _me(); po text; l jsonb; out jsonb := '[]'; f numeric;
 begin
   perform _need(p, 'buyer');
+  if coalesce(trim(p_paper_page), '') = '' and p_goods_photo is null then raise exception 'Add a photo of the items bought.'; end if;
   for l in select * from jsonb_array_elements(_lines(p_lines)) loop
     select units_per_purchase into f from items where id = l->>'code';
     if coalesce((l->>'inPurchaseUnits')::boolean, false) then
@@ -321,7 +324,7 @@ begin
   end loop;
   po := 'PO-' || lpad(nextval('po_seq')::text, 5, '0');
   perform _emit(p, 'PURCHASE', 'store', jsonb_build_object('poId', po, 'supplier', coalesce(trim(p_supplier), ''),
-    'lines', out, 'invoicePhoto', p_invoice_photo), 'buyer', p_occurred, p_paper_page);
+    'lines', out, 'invoicePhoto', p_invoice_photo, 'goodsPhoto', p_goods_photo), 'buyer', p_occurred, p_paper_page);
   return po;
 end $$;
 

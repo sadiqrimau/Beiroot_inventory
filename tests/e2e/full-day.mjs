@@ -68,6 +68,8 @@ await btn(owner, 'Branches').click(); await owner.fill('#loc-adeta', 'Adeta bran
 const buyer = await user('buyer'); await login(buyer, 'tunde', '222222');
 await buyer.fill('#po-supplier', 'Mile 12 market');
 await fillLines(buyer, 'po-lines', [{ code: 'chicken', qty: 20 }, { code: 'shawarma-bread', qty: 100 }, { code: 'tomatoes', qty: 10 }]);
+await btn(buyer, 'Log purchase').click(); await expectToast(buyer, /photo of the items bought/, 'purchase needs a photo of the items');
+await buyer.setInputFiles('#po-goods', 'photo.jpg');
 await btn(buyer, 'Log purchase').click(); await expectToast(buyer, /Logged as PO-/, 'buyer logs purchase');
 
 // --- storekeeper: open, GRN (blind, chicken 2 short), write-off ---

@@ -129,6 +129,7 @@ const buy = {
     return `<section>${lowCard}<div class="card"><h3>Log a purchase</h3>
       <label>Supplier<input id="po-supplier"></label>
       ${lineEditor('po-lines', raw, null, { purchaseUnits: true })}
+      ${photoField('po-goods', 'Photo of the items bought', !S.paper)}
       ${photoField('po-invoice', 'Photo of the invoice or receipt', false)}
       ${paperToggle(S)}${S.paper ? paperFields('po') : ''}
       <button class="primary" data-act="purchase">Log purchase</button></div>
@@ -139,8 +140,11 @@ const buy = {
   },
   act: {
     async purchase(S) { const lines = readLines('po-lines'); need(lines.length, 'Add at least one item with a quantity.');
+      const pa = paperArgs(S, 'po');
+      if (!S.paper) need(file('po-goods'), 'Add a photo of the items bought.');
+      const goods = file('po-goods') ? await uploadPhoto(file('po-goods'), S.me.id) : null;
       const inv = file('po-invoice') ? await uploadPhoto(file('po-invoice'), S.me.id) : null;
-      const po = await rpc('log_purchase', { p_supplier: val('po-supplier'), p_lines: lines, p_invoice_photo: inv, ...paperArgs(S, 'po') });
+      const po = await rpc('log_purchase', { p_supplier: val('po-supplier'), p_lines: lines, p_invoice_photo: inv, p_goods_photo: goods, ...pa });
       toast(`Logged as ${po}. The storekeeper confirms what arrives.`); },
   },
 };
